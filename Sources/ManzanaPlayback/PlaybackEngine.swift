@@ -34,6 +34,14 @@ public struct PlaybackStats: Sendable, Equatable {
     public var videoSize: CGSize = .zero
     public var interlaced = false
     public var audioDescription = ""
+    public var deinterlace: DeinterlaceMode = .off  // what's being applied now
+    public var decodedFrames = 0
+    public var outputFrames = 0
+    public var decodeErrors = 0
+    public var deinterlaceGPUms: Double = 0
+    public var outputBackwards = 0
+    public var outputLate = 0
+    public var outputMinLead: Double = 0
 }
 
 /// Demuxes one program's TS, decodes audio, and feeds the video/audio
@@ -61,6 +69,7 @@ public final class PlaybackEngine: @unchecked Sendable {
     private var aac = AACStreamParser()
     private var factory = VideoSampleFactory()
     private let audioDecoder = AudioDecoder()
+    private let video: VideoPipeline
     private var epoch: UInt32?
     private var state = PlaybackStats.State.idle
     private var haveSync = false
@@ -70,8 +79,9 @@ public final class PlaybackEngine: @unchecked Sendable {
     private var lastAudioEnd: CMTime = .invalid
     private var stats = PlaybackStats()
 
-    public init(videoRenderer: AVSampleBufferVideoRenderer) {
+    public init(videoRenderer: AVSampleBufferVideoRenderer, deinterlace: DeinterlaceMode = .auto) {
         self.videoRenderer = videoRenderer
+        video = VideoPipeline(renderer: videoRenderer, mode: deinterlace)
         synchronizer.addRenderer(videoRenderer)
         synchronizer.addRenderer(audioRenderer)
     }
@@ -106,9 +116,25 @@ public final class PlaybackEngine: @unchecked Sendable {
         }
     }
 
+    /// Deinterlacing for interlaced sources; takes effect on the next frame
+    public var deinterlace: DeinterlaceMode {
+        get { video.mode }
+        set { queue.async { self.video.mode = newValue } }
+    }
+
     public func currentStats() -> PlaybackStats {
-        queue.sync {
+        let v = video.currentStats()
+        return queue.sync {
             var s = stats
+            s.deinterlace = v.activeMode
+            s.decodedFrames = v.decoded
+            s.outputFrames = v.output
+            s.decodeErrors = v.decodeErrors
+            s.deinterlaceGPUms = v.gpuTime * 1000
+            s.outputBackwards = v.backwards
+            s.outputLate = v.late
+            s.outputMinLead = v.minLead
+            if v.interlacedSource { s.interlaced = true }
             s.state = state
             let now = synchronizer.currentTime()
             if state == .playing {
@@ -135,6 +161,7 @@ public final class PlaybackEngine: @unchecked Sendable {
     /// Drops everything in flight and waits for a fresh start point
     private func restart() {
         synchronizer.setRate(0, time: synchronizer.currentTime())
+        video.flush()
         videoRenderer.flush(removingDisplayedImage: false, completionHandler: nil)
         audioRenderer.flush()
         demux.reset()
@@ -195,7 +222,7 @@ public final class PlaybackEngine: @unchecked Sendable {
         let end = CMSampleBufferGetPresentationTimeStamp(sb) + CMSampleBufferGetDuration(sb)
         if end.isValid, !lastVideoEnd.isValid || end > lastVideoEnd { lastVideoEnd = end }
         if state == .playing {
-            videoRenderer.enqueue(sb)
+            video.decode(sb)
         } else {
             pendingVideo.append(sb)
         }
@@ -228,7 +255,7 @@ public final class PlaybackEngine: @unchecked Sendable {
         // start on the video sync point; audio before it would only play early
         let start = firstVideo ?? firstAudio ?? .zero
         synchronizer.setRate(0, time: start)
-        for sb in pendingVideo { videoRenderer.enqueue(sb) }
+        for sb in pendingVideo { video.decode(sb) }
         for sb in pendingAudio where CMSampleBufferGetPresentationTimeStamp(sb) + CMSampleBufferGetDuration(sb) > start {
             audioRenderer.enqueue(sb)
         }
