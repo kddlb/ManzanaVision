@@ -53,6 +53,8 @@ public struct PlaybackStats: Sendable, Equatable {
     public var outputBackwards = 0
     public var outputLate = 0
     public var outputMinLead: Double = 0
+
+    public init() {}
 }
 
 /// Demuxes one program's TS, decodes it, and feeds the video/audio renderers

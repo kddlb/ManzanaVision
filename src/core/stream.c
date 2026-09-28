@@ -31,6 +31,7 @@ struct stream_ctx {
 	unsigned long last_lock_check_ms;
 	unsigned long last_signal_ms;
 	unsigned long unlocked_since_ms;	/* 0 while locked */
+	bool tmcc_sent;		/* TMCC reported since the last (re)lock */
 	bool need_retune;
 	bool stop;
 };
@@ -88,6 +89,15 @@ static void tick(struct stream_ctx *s)
 
 	if (locked) {
 		s->unlocked_since_ms = 0;
+		/* TMCC is only readable once the demod has synced; report it once */
+		if (!s->tmcc_sent && s->cb->tmcc) {
+			struct mzv_tmcc tmcc;
+
+			if (mzv_read_tmcc(s->dev, &tmcc) == MZV_OK) {
+				s->cb->tmcc(&tmcc, s->cb->ctx);
+				s->tmcc_sent = true;
+			}
+		}
 	} else if (!s->unlocked_since_ms) {
 		s->unlocked_since_ms = now;
 	} else if (now - s->unlocked_since_ms >= s->relock_after_ms) {
@@ -219,6 +229,7 @@ int mzv_stream(mzv_device *dev, const struct mzv_stream_options *opts, const str
 		}
 		s->epoch++;
 		s->unlocked_since_ms = 0;
+		s->tmcc_sent = false;
 		s->last_lock_check_ms = jiffies;
 		event(s, MZV_EVENT_RELOCKED);
 	}

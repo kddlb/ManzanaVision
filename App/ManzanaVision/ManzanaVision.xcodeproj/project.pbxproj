@@ -1,0 +1,654 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 110;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		588DA62EB1A9990FAABEA87C /* ManzanaTV in Frameworks */ = {isa = PBXBuildFile; productRef = 0B254247A4E88DC957D2C08F /* ManzanaTV */; };
+		82E8F3C443B717AC01EACC52 /* ManzanaTuner in Frameworks */ = {isa = PBXBuildFile; productRef = EA96DE47D65F6F2D39D0919D /* ManzanaTuner */; };
+		8881FC9942FA531E7A78860B /* ManzanaPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0A81CE14306B1708002D6C9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0A81CDFE306B1707002D6C9F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A81CE05306B1707002D6C9F;
+			remoteInfo = ManzanaVision;
+		};
+		0A81CE1E306B1708002D6C9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0A81CDFE306B1707002D6C9F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A81CE05306B1707002D6C9F;
+			remoteInfo = ManzanaVision;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0A81CE06306B1707002D6C9F /* ManzanaVision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ManzanaVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A81CE13306B1708002D6C9F /* ManzanaVisionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManzanaVisionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A81CE1D306B1708002D6C9F /* ManzanaVisionUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManzanaVisionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		0A81CE08306B1707002D6C9F /* ManzanaVision */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ManzanaVision;
+			sourceTree = "<group>";
+		};
+		0A81CE16306B1708002D6C9F /* ManzanaVisionTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ManzanaVisionTests;
+			sourceTree = "<group>";
+		};
+		0A81CE20306B1708002D6C9F /* ManzanaVisionUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ManzanaVisionUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0A81CE03306B1707002D6C9F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				588DA62EB1A9990FAABEA87C /* ManzanaTV in Frameworks */,
+				82E8F3C443B717AC01EACC52 /* ManzanaTuner in Frameworks */,
+				8881FC9942FA531E7A78860B /* ManzanaPlayback in Frameworks */,
+			);
+		};
+		0A81CE10306B1708002D6C9F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		0A81CE1A306B1708002D6C9F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0A81CDFD306B1707002D6C9F = {
+			isa = PBXGroup;
+			children = (
+				0A81CE08306B1707002D6C9F /* ManzanaVision */,
+				0A81CE16306B1708002D6C9F /* ManzanaVisionTests */,
+				0A81CE20306B1708002D6C9F /* ManzanaVisionUITests */,
+				0A81CE07306B1707002D6C9F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0A81CE07306B1707002D6C9F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0A81CE06306B1707002D6C9F /* ManzanaVision.app */,
+				0A81CE13306B1708002D6C9F /* ManzanaVisionTests.xctest */,
+				0A81CE1D306B1708002D6C9F /* ManzanaVisionUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0A81CE05306B1707002D6C9F /* ManzanaVision */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A81CE25306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVision" */;
+			buildPhases = (
+				0A81CE02306B1707002D6C9F /* Sources */,
+				0A81CE03306B1707002D6C9F /* Frameworks */,
+				0A81CE04306B1707002D6C9F /* Resources */,
+				97CAA88953A1B9A64A1D52B0 /* Bundle firmware and licences */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A81CE08306B1707002D6C9F /* ManzanaVision */,
+			);
+			name = ManzanaVision;
+			packageProductDependencies = (
+				0B254247A4E88DC957D2C08F /* ManzanaTV */,
+				EA96DE47D65F6F2D39D0919D /* ManzanaTuner */,
+				3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */,
+			);
+			productName = ManzanaVision;
+			productReference = 0A81CE06306B1707002D6C9F /* ManzanaVision.app */;
+			productType = "com.apple.product-type.application";
+		};
+		0A81CE12306B1708002D6C9F /* ManzanaVisionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A81CE28306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVisionTests" */;
+			buildPhases = (
+				0A81CE0F306B1708002D6C9F /* Sources */,
+				0A81CE10306B1708002D6C9F /* Frameworks */,
+				0A81CE11306B1708002D6C9F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0A81CE15306B1708002D6C9F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				0A81CE16306B1708002D6C9F /* ManzanaVisionTests */,
+			);
+			name = ManzanaVisionTests;
+			productName = ManzanaVisionTests;
+			productReference = 0A81CE13306B1708002D6C9F /* ManzanaVisionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		0A81CE1C306B1708002D6C9F /* ManzanaVisionUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A81CE2B306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVisionUITests" */;
+			buildPhases = (
+				0A81CE19306B1708002D6C9F /* Sources */,
+				0A81CE1A306B1708002D6C9F /* Frameworks */,
+				0A81CE1B306B1708002D6C9F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0A81CE1F306B1708002D6C9F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				0A81CE20306B1708002D6C9F /* ManzanaVisionUITests */,
+			);
+			name = ManzanaVisionUITests;
+			productName = ManzanaVisionUITests;
+			productReference = 0A81CE1D306B1708002D6C9F /* ManzanaVisionUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0A81CDFE306B1707002D6C9F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					0A81CE05306B1707002D6C9F = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					0A81CE12306B1708002D6C9F = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 0A81CE05306B1707002D6C9F;
+					};
+					0A81CE1C306B1708002D6C9F = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 0A81CE05306B1707002D6C9F;
+					};
+				};
+			};
+			buildConfigurationList = 0A81CE01306B1707002D6C9F /* Build configuration list for PBXProject "ManzanaVision" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 0A81CDFD306B1707002D6C9F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AD2F235CB4EFDBD9B3AC4098 /* XCLocalSwiftPackageReference "../.." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0A81CE07306B1707002D6C9F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0A81CE05306B1707002D6C9F /* ManzanaVision */,
+				0A81CE12306B1708002D6C9F /* ManzanaVisionTests */,
+				0A81CE1C306B1708002D6C9F /* ManzanaVisionUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0A81CE04306B1707002D6C9F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		0A81CE11306B1708002D6C9F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		0A81CE1B306B1708002D6C9F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		97CAA88953A1B9A64A1D52B0 /* Bundle firmware and licences */ = {
+			isa = PBXShellScriptBuildPhase;
+			inputPaths = (
+				"$(PROJECT_DIR)/../../firmware/dvb-usb-dib0700-1.20.fw",
+				"$(PROJECT_DIR)/../../firmware/LICENSE.dib0700",
+				"$(PROJECT_DIR)/../../LICENSE",
+				"$(PROJECT_DIR)/../../vendor/libusb/COPYING",
+			);
+			name = "Bundle firmware and licences";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/dvb-usb-dib0700-1.20.fw",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Licenses/LICENSE.dib0700",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Licenses/LICENSE.ManzanaVision-GPL-2.0",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Licenses/COPYING.libusb-LGPL-2.1",
+			);
+			shellPath = /bin/sh;
+			shellScript = (
+				"set -eu",
+				"repo=\"${PROJECT_DIR}/../..\"",
+				"dest=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"",
+				"mkdir -p \"$dest/Licenses\"",
+				"cp \"$repo/firmware/dvb-usb-dib0700-1.20.fw\" \"$dest/\"",
+				"cp \"$repo/firmware/LICENSE.dib0700\" \"$dest/Licenses/LICENSE.dib0700\"",
+				"cp \"$repo/LICENSE\" \"$dest/Licenses/LICENSE.ManzanaVision-GPL-2.0\"",
+				"cp \"$repo/vendor/libusb/COPYING\" \"$dest/Licenses/COPYING.libusb-LGPL-2.1\"",
+				"",
+			);
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0A81CE02306B1707002D6C9F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		0A81CE0F306B1708002D6C9F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		0A81CE19306B1708002D6C9F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0A81CE15306B1708002D6C9F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A81CE05306B1707002D6C9F /* ManzanaVision */;
+			targetProxy = 0A81CE14306B1708002D6C9F /* PBXContainerItemProxy */;
+		};
+		0A81CE1F306B1708002D6C9F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A81CE05306B1707002D6C9F /* ManzanaVision */;
+			targetProxy = 0A81CE1E306B1708002D6C9F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0A81CE23306B1708002D6C9F /* Debug configuration for PBXProject "ManzanaVision" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		0A81CE24306B1708002D6C9F /* Release configuration for PBXProject "ManzanaVision" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		0A81CE26306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVision" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		0A81CE27306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVision" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		0A81CE29306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVisionTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVisionTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManzanaVision.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ManzanaVision";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		0A81CE2A306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVisionTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVisionTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManzanaVision.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ManzanaVision";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		0A81CE2C306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVisionUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVisionUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = ManzanaVision;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		0A81CE2D306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVisionUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cl.kddlb.ManzanaVisionUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = ManzanaVision;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0A81CE01306B1707002D6C9F /* Build configuration list for PBXProject "ManzanaVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A81CE23306B1708002D6C9F /* Debug configuration for PBXProject "ManzanaVision" */,
+				0A81CE24306B1708002D6C9F /* Release configuration for PBXProject "ManzanaVision" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		0A81CE25306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A81CE26306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVision" */,
+				0A81CE27306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVision" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		0A81CE28306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVisionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A81CE29306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVisionTests" */,
+				0A81CE2A306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVisionTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		0A81CE2B306B1708002D6C9F /* Build configuration list for PBXNativeTarget "ManzanaVisionUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A81CE2C306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVisionUITests" */,
+				0A81CE2D306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVisionUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AD2F235CB4EFDBD9B3AC4098 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0B254247A4E88DC957D2C08F /* ManzanaTV */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ManzanaTV;
+		};
+		3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ManzanaPlayback;
+		};
+		EA96DE47D65F6F2D39D0919D /* ManzanaTuner */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ManzanaTuner;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0A81CDFE306B1707002D6C9F /* Project object */;
+	validationLevel = 1;
+}

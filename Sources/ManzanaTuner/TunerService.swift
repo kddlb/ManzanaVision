@@ -17,15 +17,18 @@ public final class StreamSink: @unchecked Sendable {
     let packets: @Sendable (Data, UInt32) -> Void
     let program: @Sendable ([ElementaryStream]) -> Void
     let signal: @Sendable (Signal) -> Void
+    let tmcc: @Sendable (TMCC) -> Void
     let event: @Sendable (StreamEvent, UInt32) -> Void
 
     public init(packets: @escaping @Sendable (Data, UInt32) -> Void,
                 program: @escaping @Sendable ([ElementaryStream]) -> Void = { _ in },
                 signal: @escaping @Sendable (Signal) -> Void = { _ in },
+                tmcc: @escaping @Sendable (TMCC) -> Void = { _ in },
                 event: @escaping @Sendable (StreamEvent, UInt32) -> Void = { _, _ in }) {
         self.packets = packets
         self.program = program
         self.signal = signal
+        self.tmcc = tmcc
         self.event = event
     }
 }
@@ -148,6 +151,9 @@ public actor TunerService {
         }
         cb.signal = { sig, ctx in
             Unmanaged<StreamSink>.fromOpaque(ctx!).takeUnretainedValue().signal(Signal(sig!.pointee))
+        }
+        cb.tmcc = { t, ctx in
+            Unmanaged<StreamSink>.fromOpaque(ctx!).takeUnretainedValue().tmcc(TMCC(t!.pointee))
         }
         cb.event = { ev, epoch, ctx in
             let e: StreamEvent

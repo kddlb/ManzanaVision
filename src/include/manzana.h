@@ -245,6 +245,8 @@ struct mzv_stream_callbacks {
 	void (*program)(const struct mzv_program *program, void *ctx);
 	/* Signal readings every signal_interval_ms */
 	void (*signal)(const struct mzv_signal *signal, void *ctx);
+	/* Transmission parameters, once decoded after each (re)lock */
+	void (*tmcc)(const struct mzv_tmcc *tmcc, void *ctx);
 	void (*event)(enum mzv_event event, uint32_t epoch, void *ctx);
 	void *ctx;
 };

@@ -6,3 +6,6 @@
 /fixtures/
 /.build/
 /.swiftpm/
+/App/**/xcuserdata/
+*.xcresult
+*.profraw

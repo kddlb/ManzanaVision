@@ -54,6 +54,7 @@ final class LiveSource: PlaySource, @unchecked Sendable {
         case .signalLost(let c): "signal lost on RF \(c.rf), re-tuning"
         case .playing(let c, let r): "playing \(c.virtual), reception \(r)"
         case .disconnected: "tuner unplugged; waiting for it"
+        case .scanning(let rf): "scanning RF \(rf)"
         case .stopped: "stopped"
         }
     }

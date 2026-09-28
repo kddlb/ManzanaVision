@@ -20,6 +20,8 @@ public enum LiveStatus: Sendable, Equatable {
     case playing(Channel, Reception)
     /// Pulled out mid-play; waiting for it to come back
     case disconnected
+    /// Scanning for channels (playback stopped)
+    case scanning(rf: Int)
     case stopped
 
     public var channel: Channel? {
@@ -33,7 +35,7 @@ public enum LiveStatus: Sendable, Equatable {
 /// Plays channels from the tuner into a PlaybackEngine, and keeps going
 /// through unplug/replug, a busy stick, no signal and signal loss, reporting
 /// all of it as LiveStatus.
-public final class LiveSession: @unchecked Sendable {
+public final class LiveSession: TVSession, @unchecked Sendable {
     public let engine: PlaybackEngine
     public let tuner: TunerService
     public let monitor: DeviceMonitor
@@ -43,6 +45,9 @@ public final class LiveSession: @unchecked Sendable {
     /// Signal readings (4 Hz while streaming) for meters; only the newest is kept
     public let signalUpdates: AsyncStream<Signal>
     private let signalContinuation: AsyncStream<Signal>.Continuation
+    /// Transmission parameters after each lock
+    public let tmccUpdates: AsyncStream<TMCC>
+    private let tmccContinuation: AsyncStream<TMCC>.Continuation
 
     private let lock = NSLock()
     private var _status: LiveStatus = .stopped
@@ -59,6 +64,7 @@ public final class LiveSession: @unchecked Sendable {
         self.monitor = monitor
         (statusUpdates, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(16))
         (signalUpdates, signalContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        (tmccUpdates, tmccContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     }
 
     deinit {
@@ -66,6 +72,7 @@ public final class LiveSession: @unchecked Sendable {
         watcher?.cancel()
         continuation.finish()
         signalContinuation.finish()
+        tmccContinuation.finish()
     }
 
     public var status: LiveStatus { lock.withLock { _status } }
@@ -96,6 +103,46 @@ public final class LiveSession: @unchecked Sendable {
         }
         lock.withLock { task = next }
         startWatcher()
+    }
+
+    public func loadChannels() throws -> [Channel] {
+        try ChannelStore.load()
+    }
+
+    public func scan(_ rfs: ClosedRange<Int>, psiTimeout: Duration) -> AsyncThrowingStream<ScanProgress, Error> {
+        AsyncThrowingStream { cont in
+            let previous = lock.withLock { task }
+            tuner.cancel()
+            previous?.cancel()
+            let job = Task.detached { [self] in
+                await previous?.value
+                engine.stop()
+                do {
+                    guard DeviceMonitor.isPresent else { throw TunerError.noDevice }
+                    _ = try await tuner.open(firmware: try FirmwareStore.locate())
+                    var muxes: [Mux] = []
+                    for rf in rfs {
+                        try Task.checkCancellation()
+                        publish(.scanning(rf: rf))
+                        cont.yield(.tuning(rf: rf))
+                        let mux = try await tuner.scan(rf: rf, psiTimeout: psiTimeout)
+                        muxes.append(mux)
+                        cont.yield(.result(mux))
+                    }
+                    cont.yield(.finished(changedMuxes: try ChannelStore.merge(muxes)))
+                    publish(.stopped)
+                    cont.finish()
+                } catch {
+                    publish(.stopped)
+                    cont.finish(throwing: error)
+                }
+            }
+            lock.withLock { task = job }
+            cont.onTermination = { [self] _ in
+                job.cancel()
+                tuner.cancel()
+            }
+        }
     }
 
     public func stop() {
@@ -188,6 +235,7 @@ public final class LiveSession: @unchecked Sendable {
                 signalContinuation.yield(s)
                 if case .playing(let c, let r) = status, r != reception { publish(.playing(c, reception)) }
             },
+            tmcc: { [self] t in tmccContinuation.yield(t) },
             event: { [self] e, _ in
                 switch e {
                 case .locked, .relocked:

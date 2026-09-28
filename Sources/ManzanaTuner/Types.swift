@@ -132,13 +132,27 @@ public struct Mux: Sendable, Equatable {
         }
     }
 
+    /// The services of a recording (PSI from its first 16 MB); no signal or TMCC
+    public static func fromRecording(_ url: URL, rf: Int) throws -> Mux {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: 16 << 20)
+        var m = mzv_mux()
+        data.withUnsafeBytes { raw in
+            mzv_mux_from_packets(raw.bindMemory(to: UInt8.self).baseAddress, data.count / 188, Int32(rf), &m)
+        }
+        m.signal.has_lock = true
+        m.signal.has_signal = true
+        return Mux(m)
+    }
+
     public static func == (a: Mux, b: Mux) -> Bool {
         a.rf == b.rf && a.signal == b.signal && a.services == b.services && a.tmcc == b.tmcc
     }
 }
 
 /// A saved channel
-public struct Channel: Sendable, Equatable, Hashable, Identifiable {
+public struct Channel: Sendable, Equatable, Hashable, Identifiable, Codable {
     public var major: Int
     public var minor: Int
     public var name: String
