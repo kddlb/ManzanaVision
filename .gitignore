@@ -9,3 +9,4 @@
 /App/**/xcuserdata/
 *.xcresult
 *.profraw
+.DS_Store

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A31375A306B1CC600DC47A5 /* mzicon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A313759306B1CC600DC47A5 /* mzicon.icon */; };
 		588DA62EB1A9990FAABEA87C /* ManzanaTV in Frameworks */ = {isa = PBXBuildFile; productRef = 0B254247A4E88DC957D2C08F /* ManzanaTV */; };
 		82E8F3C443B717AC01EACC52 /* ManzanaTuner in Frameworks */ = {isa = PBXBuildFile; productRef = EA96DE47D65F6F2D39D0919D /* ManzanaTuner */; };
 		8881FC9942FA531E7A78860B /* ManzanaPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */; };
@@ -30,6 +31,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0A313759306B1CC600DC47A5 /* mzicon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = mzicon.icon; sourceTree = "<group>"; };
 		0A81CE06306B1707002D6C9F /* ManzanaVision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ManzanaVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A81CE13306B1708002D6C9F /* ManzanaVisionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManzanaVisionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A81CE1D306B1708002D6C9F /* ManzanaVisionUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManzanaVisionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -81,6 +83,7 @@
 				0A81CE08306B1707002D6C9F /* ManzanaVision */,
 				0A81CE16306B1708002D6C9F /* ManzanaVisionTests */,
 				0A81CE20306B1708002D6C9F /* ManzanaVisionUITests */,
+				0A313759306B1CC600DC47A5 /* mzicon.icon */,
 				0A81CE07306B1707002D6C9F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -215,6 +218,7 @@
 		0A81CE04306B1707002D6C9F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				0A31375A306B1CC600DC47A5 /* mzicon.icon in Resources */,
 			);
 		};
 		0A81CE11306B1708002D6C9F /* Resources */ = {
@@ -409,7 +413,7 @@
 		0A81CE26306B1708002D6C9F /* Debug configuration for PBXNativeTarget "ManzanaVision" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mzicon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -452,7 +456,7 @@
 		0A81CE27306B1708002D6C9F /* Release configuration for PBXNativeTarget "ManzanaVision" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mzicon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
