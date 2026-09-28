@@ -13,6 +13,13 @@ for src in "$@"; do
 	name=$(basename "$src" .ts)
 	# full-mux rate is ~17-18 Mbit/s; cut on a 188-byte packet boundary
 	bytes=$(( seconds * 2300000 / 188 * 188 ))
-	head -c "$bytes" "$src" > "$out/$name-${seconds}s.ts"
-	echo "$out/$name-${seconds}s.ts"
+	clip="$out/$name-${seconds}s.ts"
+	head -c "$bytes" "$src" > "$clip"
+	# ground truth for the Swift parser tests: per-PID packet/frame counts
+	if command -v ffprobe >/dev/null; then
+		ffprobe -v error -count_packets -count_frames -show_entries \
+			stream=id,codec_name,codec_type,field_order,sample_rate,channels,profile,nb_read_packets,nb_read_frames \
+			-of json "$clip" > "${clip%.ts}.expect.json" 2>/dev/null
+	fi
+	echo "$clip"
 done
