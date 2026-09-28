@@ -20,6 +20,8 @@ public final class Exporter: @unchecked Sendable {
         /// that reset the broadcaster's clock) or their size changed mid-file
         public var skipped = 0
         public var decodeErrors = 0
+        /// Seconds of silence put into audio gaps (signal loss while recording)
+        public var silence: Double = 0
         public var duration: Double = 0
     }
 
@@ -246,6 +248,10 @@ private final class Writer: @unchecked Sendable {
     private var queuedAudio: [CMSampleBuffer] = []
     private var lastVideo: CMTime = .invalid
     private var lastAudio: CMTime = .invalid
+    private var audioEnd: CMTime = .invalid
+    /// The audio encoder joins whatever it's given end to end, ignoring
+    /// timestamps, so holes longer than this are filled with silence
+    private static let audioGapTolerance = CMTime(value: 20, timescale: 1000)
     private var end: CMTime = .invalid
     private var videoSize: (Int, Int)?
     private var summary = Exporter.Summary()
@@ -437,7 +443,16 @@ private final class Writer: @unchecked Sendable {
                 }
             }
             if let sample = queuedAudio.first {
-                switch writeAudio(sample) {
+                let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+                let from = audioEnd.isValid ? audioEnd : start
+                if pts - from > Self.audioGapTolerance {
+                    let fill = Self.silence(like: sample, from: from, until: pts)
+                    queuedAudio.insert(contentsOf: fill, at: 0)
+                    summary.silence += fill.reduce(0) { $0 + CMSampleBufferGetDuration($1).seconds }
+                    progress = !fill.isEmpty
+                    if progress { continue }
+                }
+                switch writeAudio(queuedAudio[0]) {
                 case .written, .skipped: queuedAudio.removeFirst(); progress = true
                 case .notNow: break
                 case .failed: return
@@ -482,10 +497,39 @@ private final class Writer: @unchecked Sendable {
         if result == .written {
             lastAudio = pts
             let stop = pts + CMSampleBufferGetDuration(sample)
+            audioEnd = stop
             end = max(end.isValid ? end : stop, stop)
             summary.audioBuffers += 1
         }
         return result
+    }
+
+    /// Silent PCM in the format of `sample`, from `from` up to `until`, in
+    /// buffers of at most a second
+    private static func silence(like sample: CMSampleBuffer, from: CMTime, until: CMTime) -> [CMSampleBuffer] {
+        guard let format = CMSampleBufferGetFormatDescription(sample),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
+              asbd.mBytesPerFrame > 0, asbd.mSampleRate > 0 else { return [] }
+        let rate = CMTimeScale(asbd.mSampleRate)
+        var frames = Int(((until - from).seconds * asbd.mSampleRate).rounded())
+        var t = from
+        var out: [CMSampleBuffer] = []
+        while frames > 0 {
+            let n = min(frames, Int(rate))
+            var size = Int(asbd.mBytesPerFrame)
+            guard let block = try? makeBlockBuffer([UInt8](repeating: 0, count: n * size)) else { break }
+            var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: rate),
+                                            presentationTimeStamp: t, decodeTimeStamp: .invalid)
+            var buffer: CMSampleBuffer?
+            CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: block, formatDescription: format,
+                                      sampleCount: n, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                      sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &buffer)
+            guard let buffer else { break }
+            out.append(buffer)
+            t = t + CMTime(value: CMTimeValue(n), timescale: rate)
+            frames -= n
+        }
+        return out
     }
 
     private func attempt(_ append: () throws -> Bool) -> Append {

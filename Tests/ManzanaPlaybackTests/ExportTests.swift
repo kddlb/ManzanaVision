@@ -56,6 +56,30 @@ struct Export {
         #expect(!FileManager.default.fileExists(atPath: out.path))
     }
 
+    @Test func gapsStayInSync() async throws {
+        // a recording through a 6 s dropout: cut the middle out of the clip
+        let ts = try #require(Fixtures.data("rf27-5min-20s"))
+        let packets = ts.count / 188
+        let cut = (packets * 3 / 10)..<(packets * 6 / 10)
+        let gapped = ts.prefix(cut.lowerBound * 188) + ts[(cut.upperBound * 188)...]
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent("mzv-gap-\(UUID().uuidString).ts")
+        let out = source.deletingPathExtension().appendingPathExtension("mp4")
+        defer {
+            try? FileManager.default.removeItem(at: source)
+            try? FileManager.default.removeItem(at: out)
+        }
+        try Data(gapped).write(to: source)
+        let summary = try await Exporter(source: source, serviceID: 0x2600, destination: out).run { _ in }
+        #expect(summary.silence > 4, "the hole in the audio is filled, got \(summary.silence) s")
+
+        let asset = AVURLAsset(url: out)
+        let video = try #require(try await asset.loadTracks(withMediaType: .video).first)
+        let audio = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+        let v = try await video.load(.timeRange), a = try await audio.load(.timeRange)
+        // without the fill, audio after the gap would start early and the track would be ~6 s short
+        #expect(abs(a.end.seconds - v.end.seconds) < 0.6, "audio ends at \(a.end.seconds), video at \(v.end.seconds)")
+    }
+
     @Test func findsTheServiceInARecording() throws {
         // a whole-mux capture lists every service; the first is 9.1's
         #expect(Exporter.firstServiceID(in: Fixtures.dir!.appendingPathComponent("rf27-5min-20s.ts")) == 0x2600)
