@@ -1,0 +1,5 @@
+/build/
+/manzanavision
+/firmware/*.fw
+/compile_commands.json
+*.ts
