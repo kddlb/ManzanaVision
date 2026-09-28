@@ -17,6 +17,11 @@ void scan_interrupt(void)
 	interrupted = 1;
 }
 
+bool scan_interrupted(void)
+{
+	return interrupted;
+}
+
 uint32_t isdbt_channel_freq(int rf)
 {
 	/* ABNT NBR 15601: 473 MHz + 6 MHz steps, plus a 1/7 MHz offset */
@@ -36,7 +41,7 @@ struct mux_result {
 	int ts_packets;
 };
 
-static const char *mod_name(enum fe_modulation m)
+const char *isdbt_mod_name(enum fe_modulation m)
 {
 	switch (m) {
 	case QPSK: return "QPSK";
@@ -47,7 +52,7 @@ static const char *mod_name(enum fe_modulation m)
 	}
 }
 
-static const char *fec_name(enum fe_code_rate f)
+const char *isdbt_fec_name(enum fe_code_rate f)
 {
 	switch (f) {
 	case FEC_1_2: return "1/2";
@@ -150,7 +155,7 @@ static void print_text(const struct mux_result *r)
 			if (!c->layer[l].segment_count)
 				continue;
 			printf(" | %c: %2d seg %s %s I=%d %s", 'A' + l, c->layer[l].segment_count,
-			       mod_name(c->layer[l].modulation), fec_name(c->layer[l].fec),
+			       isdbt_mod_name(c->layer[l].modulation), isdbt_fec_name(c->layer[l].fec),
 			       c->layer[l].interleaving, (r->layer_lock >> l) & 1 ? "ok" : "NO LOCK");
 		}
 		printf("\n");
@@ -217,7 +222,7 @@ static void print_json(const struct mux_result *r, bool first)
 				continue;
 			printf("%s{\"layer\": \"%c\", \"segments\": %d, \"modulation\": \"%s\", \"fec\": \"%s\", \"interleaving\": %d, \"lock\": %s}",
 			       lfirst ? "" : ", ", 'A' + l, c->layer[l].segment_count,
-			       mod_name(c->layer[l].modulation), fec_name(c->layer[l].fec), c->layer[l].interleaving,
+			       isdbt_mod_name(c->layer[l].modulation), isdbt_fec_name(c->layer[l].fec), c->layer[l].interleaving,
 			       (r->layer_lock >> l) & 1 ? "true" : "false");
 			lfirst = false;
 		}

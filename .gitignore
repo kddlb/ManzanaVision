@@ -3,3 +3,4 @@
 /firmware/*.fw
 /compile_commands.json
 *.ts
+/.cache/

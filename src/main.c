@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "dib0700.h"
+#include "meter.h"
 #include "scan.h"
 #include "stk8096gp.h"
 
@@ -25,6 +26,8 @@ static void usage(void)
 		"                                 scan UHF channels (default 14-51)\n"
 		"  tune <rf> [--dump FILE] [--seconds N]\n"
 		"                                 tune one channel, optionally capture TS\n"
+		"  signal <rf> [--beep]           live signal meter for aiming an antenna;\n"
+		"                                 --beep plays a tone whose pitch follows SNR\n"
 		"\n"
 		"The bridge firmware is read from $MANZANA_FIRMWARE or " DEFAULT_FIRMWARE ".\n");
 }
@@ -44,6 +47,7 @@ int main(int argc, char **argv)
 		{ "psi-timeout", required_argument, NULL, 'p' },
 		{ "dump", required_argument, NULL, 'd' },
 		{ "seconds", required_argument, NULL, 's' },
+		{ "beep", no_argument, NULL, 'b' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "help", no_argument, NULL, 'h' },
 		{ 0 }
@@ -52,6 +56,7 @@ int main(int argc, char **argv)
 	const char *dump = NULL, *fw, *cmd;
 	unsigned int seconds = 10;
 	int verbose = 0, c, ret, rf = 0;
+	bool beep = false;
 	struct dib0700 *d;
 
 	/* "+" stops at the command; options after it are parsed below */
@@ -66,7 +71,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	cmd = argv[optind++];
-	if (!strcmp(cmd, "tune")) {
+	if (!strcmp(cmd, "tune") || !strcmp(cmd, "signal")) {
 		if (optind >= argc) {
 			usage();
 			return 2;
@@ -81,11 +86,12 @@ int main(int argc, char **argv)
 		case 'p': so.psi_timeout_ms = atoi(optarg); break;
 		case 'd': dump = optarg; break;
 		case 's': seconds = atoi(optarg); break;
+		case 'b': beep = true; break;
 		case 'v': verbose++; break;
 		default: usage(); return 2;
 		}
 	}
-	if (strcmp(cmd, "probe") && strcmp(cmd, "scan") && strcmp(cmd, "tune")) {
+	if (strcmp(cmd, "probe") && strcmp(cmd, "scan") && strcmp(cmd, "tune") && strcmp(cmd, "signal")) {
 		usage();
 		return 2;
 	}
@@ -114,6 +120,8 @@ int main(int argc, char **argv)
 		ret = scan_run(d, &so);
 	else if (!strcmp(cmd, "tune"))
 		ret = tune_run(d, rf, dump, seconds);
+	else if (!strcmp(cmd, "signal"))
+		ret = meter_run(d, rf, beep);
 	else
 		ret = 0;
 

@@ -547,6 +547,12 @@ u8 stk_layer_lock(void)
 	return ((lock >> 7) & 1) | (((lock >> 6) & 1) << 1) | (((lock >> 5) & 1) << 2);
 }
 
+u16 stk_read_ucb(void)
+{
+	/* same register dib8000_read_unc_blocks uses for rev < 0x8090 */
+	return demod_read16(565);
+}
+
 void stk_read_signal(u16 *strength, u16 *snr)
 {
 	*strength = 0;

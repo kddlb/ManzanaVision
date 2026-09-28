@@ -52,7 +52,10 @@ The firmware is not included in the repository. The script downloads it from lin
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # tune one channel and list its services
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
+./manzanavision signal 23 --beep     # live signal meter for aiming the antenna
 ```
+
+`signal` redraws SNR, level, per-layer lock and uncorrectable packets per second four times a second, and re-tunes if the lock drops. With `--beep` it plays a finder tone like a satellite receiver's: the pitch rises with SNR, steady when every layer is locked, pulsing when only some are, and silent with no lock. You can aim the antenna by ear.
 
 `-v` turns on the drivers' debug log and `-vv` adds an I²C trace. Put them before the command, for example `./manzanavision -v tune 27`.
 

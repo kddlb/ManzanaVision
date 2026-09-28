@@ -55,7 +55,10 @@ scripts/fetch-firmware.sh   # linux-firmware から dvb-usb-dib0700-1.20.fw を�
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # 1 チャンネルを選局し、サービスを一覧表示
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
+./manzanavision signal 23 --beep     # アンテナ調整用のリアルタイム信号メーター
 ```
+
+`signal` は、SNR、信号レベル、各階層のロック状態、訂正不能パケット数（毎秒）を 1 秒に 4 回更新し、ロックが外れると自動で再選局します。`--beep` を付けると、衛星受信機のようなアンテナ調整音が鳴ります。音の高さは SNR に応じて上がり、全階層がロックしていれば連続音、一部だけなら断続音になり、ロックしていないときは鳴りません。耳だけでアンテナを調整できます。
 
 `-v` でドライバーのデバッグログを、`-vv` でさらに I²C のトレースを出力します。これらはコマンドの前に付けます（例：`./manzanavision -v tune 27`）。
 

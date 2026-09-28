@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <media/dvb_frontend.h>
+
 struct dib0700;
 
 struct scan_opts {
@@ -26,5 +28,10 @@ int tune_run(struct dib0700 *d, int rf, const char *dump_path, unsigned int seco
 
 /* request a clean stop from a signal handler */
 void scan_interrupt(void);
+bool scan_interrupted(void);
+
+/* Names for TMCC values, shared with the signal meter */
+const char *isdbt_mod_name(enum fe_modulation m);
+const char *isdbt_fec_name(enum fe_code_rate f);
 
 #endif

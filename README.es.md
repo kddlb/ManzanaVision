@@ -52,7 +52,10 @@ El firmware no viene en el repositorio. El script lo descarga desde linux-firmwa
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # sintoniza un canal y lista sus servicios
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
+./manzanavision signal 23 --beep     # medidor de señal en vivo para orientar la antena
 ```
+
+`signal` actualiza cuatro veces por segundo el SNR, el nivel, el enganche de cada capa y los paquetes con errores incorregibles por segundo, y vuelve a sintonizar si se pierde el enganche. Con `--beep` emite un tono como el de los decodificadores satelitales: el tono sube con el SNR, es continuo cuando todas las capas enganchan, intermitente cuando solo algunas lo hacen y se calla si no hay enganche. Así puedes orientar la antena de oído.
 
 `-v` activa el log de depuración de los drivers y `-vv` agrega una traza de I²C. Van antes del comando, por ejemplo `./manzanavision -v tune 27`.
 

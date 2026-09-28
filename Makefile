@@ -4,9 +4,9 @@ CFLAGS  ?= -O2 -g
 CFLAGS  += -std=gnu11 -Wall -Wno-shift-negative-value \
            -Isrc/compat -Isrc/frontends -Isrc/bridge -Isrc/board -Isrc/ts -Isrc \
            $(shell pkg-config --cflags libusb-1.0)
-LDLIBS  += $(shell pkg-config --libs libusb-1.0)
+LDLIBS  += $(shell pkg-config --libs libusb-1.0) -framework AudioToolbox
 
-SRCS := src/main.c src/scan.c \
+SRCS := src/main.c src/scan.c src/meter.c src/tone.c \
         src/ts/psi.c \
         src/bridge/dib0700.c \
         src/board/stk8096gp.c \

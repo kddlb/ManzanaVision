@@ -26,6 +26,9 @@ enum fe_status stk_read_status(void);
 /* MPEG lock per ISDB-T layer: bit0 = A, bit1 = B, bit2 = C */
 u8 stk_layer_lock(void);
 
+/* Uncorrectable TS packets (all layers) in the demod's current measurement window */
+u16 stk_read_ucb(void);
+
 /* Signal strength (0..65535) and SNR in 0.1 dB, as reported by the demod */
 void stk_read_signal(u16 *strength, u16 *snr);
 
