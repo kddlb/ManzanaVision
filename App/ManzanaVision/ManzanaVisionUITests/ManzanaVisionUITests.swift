@@ -108,4 +108,28 @@ final class ManzanaVisionUITests: XCTestCase {
             sheet.typeKey(.escape, modifierFlags: [])
         }
     }
+
+    func testSignalLossAndFullScreen() throws {
+        launch()
+        XCTAssertTrue(waitForTitle("9.1"))
+        sleep(3)
+        window.typeKey("l", modifierFlags: [.command, .control])  // Simulate Signal Loss (6 s)
+        let lost = window.staticTexts["Signal lost — re-tuning"]
+        XCTAssertTrue(lost.waitForExistence(timeout: 5))
+        sleep(4)
+        snapshot("7 signal lost, blurred")
+        XCTAssertTrue(lost.waitForNonExistence(timeout: 15), "recovers after the dropout")
+        sleep(2)
+        snapshot("8 recovered")
+
+        let view = app.menuBars.menuBarItems["View"]
+        view.click()
+        view.menuItems["Enter Full Screen"].click()
+        sleep(3)
+        snapshot("9 full screen")
+        XCTAssertFalse(window.staticTexts["Tevex"].isHittable, "no sidebar in full screen")
+        window.typeKey(.escape, modifierFlags: [])  // leaves full screen
+        sleep(3)
+        XCTAssertTrue(window.staticTexts["Tevex"].isHittable, "sidebar back after full screen")
+    }
 }

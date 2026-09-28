@@ -38,6 +38,8 @@ struct SignalHUD: View {
             row("Recovery", "\(s.restarts) restarts, \(s.stalls) stalls, \(s.rebuffers) rebuffers")
         }
         .font(.caption.monospacedDigit())
+        .animation(.smooth, value: model.signal == nil)
+        .animation(.smooth, value: model.tmcc == nil)
         .padding(12)
         .frame(width: 360)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
@@ -65,6 +67,7 @@ struct SignalHUD: View {
             Text(label).frame(width: 84, alignment: .leading).foregroundStyle(.secondary)
             ProgressView(value: min(Swift.max(value, 0), max), total: max)
                 .progressViewStyle(.linear)
+                .animation(.linear(duration: 0.25), value: value)
             Text(text).frame(width: 64, alignment: .trailing)
         }
     }
@@ -77,6 +80,8 @@ struct SignalHUD: View {
         return HStack(spacing: 3) {
             Image(systemName: locked ? "checkmark.circle.fill" : "xmark.circle")
                 .foregroundStyle(locked ? .green : (used ? .red : .secondary))
+                .contentTransition(.symbolEffect(.replace))
+                .animation(.snappy, value: locked)
             Text(detail.isEmpty ? name : "\(name) \(detail)")
         }
         .opacity(used ? 1 : 0.4)

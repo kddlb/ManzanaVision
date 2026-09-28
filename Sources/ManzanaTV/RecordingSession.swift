@@ -20,6 +20,7 @@ public final class RecordingSession: TVSession, @unchecked Sendable {
     private var source: FileSource?
     private var ticker: Task<Void, Never>?
     private var session: UInt32 = 0
+    private var lostUntil: ContinuousClock.Instant?
 
     /// All "rfNN*.ts" files in a directory (the first per RF wins)
     public init(engine: PlaybackEngine, directory: URL) {
@@ -76,19 +77,43 @@ public final class RecordingSession: TVSession, @unchecked Sendable {
         }
         let src = FileSource(url: url, serviceID: channel.serviceID)
         let engine = self.engine
-        src.start(packets: { engine.feed($0, epoch: base + $1) }, program: { engine.setProgram($0) })
-        lock.withLock { source = src }
+        src.start(packets: { [self] in if !signalLost { engine.feed($0, epoch: base + $1) } },
+                  program: { engine.setProgram($0) })
+        lock.withLock {
+            source = src
+            lostUntil = nil
+        }
         // a steady synthetic signal, and "playing" once the engine is
         ticker = Task.detached { [self] in
             let signal = Signal(hasSignal: true, hasLock: true, layerLock: channel.isOneSeg ? 0b001 : 0b011,
                                 strengthPercent: 70, snr: 24, errorsPerSecond: 0)
+            let lost = Signal(hasSignal: true, hasLock: false, layerLock: 0,
+                              strengthPercent: 20, snr: 0, errorsPerSecond: 0)
             while !Task.isCancelled {
-                signalC.yield(signal)
-                let playing = engine.currentStats().state == .playing
-                if playing, case .tuning = status { publish(.playing(channel, .good)) }
+                if signalLost {
+                    signalC.yield(lost)
+                    publish(.signalLost(channel))
+                } else {
+                    signalC.yield(signal)
+                    let playing = engine.currentStats().state == .playing
+                    switch status {
+                    case .tuning, .signalLost: if playing { publish(.playing(channel, .good)) }
+                    default: break
+                    }
+                }
                 try? await Task.sleep(for: .milliseconds(250))
             }
         }
+    }
+
+    private var signalLost: Bool {
+        lock.withLock { lostUntil.map { .now < $0 } ?? false }
+    }
+
+    /// Stops the data for a while, as if the antenna were pulled, to see
+    /// how the app rides out a dropout
+    public func simulateSignalLoss(for duration: Duration) {
+        lock.withLock { lostUntil = .now + duration }
     }
 
     private func stopSource() {

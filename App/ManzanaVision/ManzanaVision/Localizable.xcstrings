@@ -1502,6 +1502,23 @@
         }
       }
     },
+    "Simulate Signal Loss": {
+      "comment": "Recordings (development) mode only",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simular pérdida de señal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simular perda de sinal"
+          }
+        }
+      }
+    },
     "Starting the tuner…": {
       "localizations": {
         "es": {

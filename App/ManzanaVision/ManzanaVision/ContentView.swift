@@ -6,9 +6,12 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var showingScan = false
+    @State private var columns = NavigationSplitViewVisibility.all
+    @State private var columnsBeforeFullScreen = NavigationSplitViewVisibility.all
+    @State private var fullScreen = false
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             ChannelList(showingScan: $showingScan)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
@@ -16,6 +19,18 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingScan) {
             ScanSheet()
+        }
+        // full screen is just the picture: no sidebar, no toolbar
+        .toolbar(fullScreen ? .hidden : .automatic, for: .windowToolbar)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
+            columnsBeforeFullScreen = columns
+            columns = .detailOnly
+            fullScreen = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
+            // "automatic" would leave the sidebar hidden
+            columns = columnsBeforeFullScreen == .detailOnly ? .detailOnly : .all
+            fullScreen = false
         }
     }
 }

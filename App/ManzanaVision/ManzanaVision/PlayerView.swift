@@ -10,23 +10,35 @@ struct PlayerView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        let lost = if case .signalLost = model.status { true } else { false }
         ZStack {
             // the picture stays in the detail area; only the black extends under the sidebar
             Color.black.ignoresSafeArea()
+            // the frozen picture slowly blurs and fades while re-tuning, and snaps back on recovery
             VideoLayerView(layer: model.layer)
+                .blur(radius: lost ? 30 : 0, opaque: true)
+                .saturation(lost ? 0.2 : 1)
+                .brightness(lost ? -0.2 : 0)
+                .animation(lost ? .easeIn(duration: 4) : .easeOut(duration: 0.4), value: lost)
+                .allowsHitTesting(false)
             StatusOverlay(showingScan: $showingScan)
             VStack {
                 HStack(alignment: .top) {
                     ChannelOSD()
                     Spacer()
-                    if model.showHUD { SignalHUD() }
+                    if model.showHUD {
+                        SignalHUD().modifier(SlideIn(edge: .trailing))
+                    }
                 }
                 Spacer()
                 ReceptionBadge()
             }
             .padding()
+            .animation(.snappy, value: model.showHUD)
         }
         .background(.black)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { NSApp.keyWindow?.toggleFullScreen(nil) }
         .navigationTitle(model.current.map { "\($0.virtual) \($0.name)" } ?? "ManzanaVision")
         .focusable()
         .focusEffectDisabled()
@@ -41,7 +53,12 @@ struct PlayerView: View {
             return .handled
         }
         .onKeyPress(.escape) {
-            model.cancelEntry()
+            // cancels a channel number being typed, else leaves full screen
+            if !model.entry.isEmpty {
+                model.cancelEntry()
+            } else if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
             return .handled
         }
         .onKeyPress(.pageUp) {
@@ -81,7 +98,7 @@ struct StatusOverlay: View {
                 panel("No Signal", "antenna.radiowaves.left.and.right.slash",
                       Text("Nothing is being received on RF \(c.rf). Check the antenna, or scan again."))
             case .signalLost:
-                // the last picture stays up; say why it's frozen
+                // the last picture stays up (blurred); say why it's frozen
                 VStack {
                     Spacer()
                     Label("Signal lost — re-tuning", systemImage: "antenna.radiowaves.left.and.right.slash")
@@ -89,6 +106,7 @@ struct StatusOverlay: View {
                         .background(.ultraThinMaterial, in: Capsule())
                         .padding(.bottom, 48)
                 }
+                .modifier(SlideIn(edge: .bottom))
             case .disconnected:
                 panel("Tuner Unplugged", "cable.connector.slash",
                       Text("Plug the tuner back in to continue watching."))
@@ -107,13 +125,14 @@ struct StatusOverlay: View {
                 }
             }
         }
-        .animation(.default, value: model.status)
+        .animation(.smooth, value: model.status)
     }
 
     private func panel(_ title: LocalizedStringKey, _ symbol: String, _ text: Text) -> some View {
         ContentUnavailableView(title, systemImage: symbol, description: text)
             .foregroundStyle(.white)
             .background(.black.opacity(0.6))
+            .transition(.opacity)
     }
 
     private func progress(_ text: LocalizedStringKey) -> some View {
@@ -123,6 +142,7 @@ struct StatusOverlay: View {
         }
         .padding(24)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .transition(.scale(0.9).combined(with: .opacity))
     }
 }
 
@@ -131,24 +151,35 @@ struct ChannelOSD: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Group {
+        ZStack(alignment: .topLeading) {
             if !model.entry.isEmpty {
-                Text(model.entry + "_")
-                    .font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
-            } else if let c = model.banner {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(c.virtual).font(.system(size: 36, weight: .semibold, design: .rounded).monospacedDigit())
-                    Text(c.name).font(.title3)
+                box {
+                    Text(model.entry + "_")
+                        .font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
+                        .contentTransition(.numericText())
                 }
+                .transition(.opacity)
+            } else if let c = model.banner {
+                box {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(c.virtual).font(.system(size: 36, weight: .semibold, design: .rounded).monospacedDigit())
+                        Text(c.name).font(.title3)
+                    }
+                }
+                .id(c.id)  // a zap replaces the banner rather than editing it
+                .modifier(SlideIn(edge: .leading))
             }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial.opacity(model.entry.isEmpty && model.banner == nil ? 0 : 1),
-                    in: RoundedRectangle(cornerRadius: 10))
-        .animation(.easeOut(duration: 0.2), value: model.banner)
-        .animation(.easeOut(duration: 0.1), value: model.entry)
+        .animation(.snappy, value: model.banner)
+        .animation(.snappy(duration: 0.2), value: model.entry)
+    }
+
+    private func box(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -157,17 +188,31 @@ struct ReceptionBadge: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if case .playing(_, let r) = model.status, r != .good {
-            HStack {
+        let warning: Reception? = if case .playing(_, let r) = model.status, r != .good { r } else { nil }
+        HStack {
+            if let r = warning {
                 Label(r == .poor ? LocalizedStringKey("Poor reception") : "Weak reception",
                       systemImage: r == .poor ? "wifi.exclamationmark" : "wifi")
+                    .contentTransition(.symbolEffect(.replace))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
                     .foregroundStyle(r == .poor ? .orange : .yellow)
-                Spacer()
+                    .modifier(SlideIn(edge: .bottom))
             }
+            Spacer()
         }
+        .animation(.snappy, value: warning)
+    }
+}
+
+/// Slides an overlay in from its edge, or just fades it with Reduce Motion on
+struct SlideIn: ViewModifier {
+    let edge: Edge
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.transition(reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity))
     }
 }
 
