@@ -24,7 +24,7 @@ struct SettingsView: View {
             Form {
                 LabeledContent("Channel list", value: ChannelStore.defaultURL.path)
                 LabeledContent("Firmware") {
-                    Text((try? FirmwareStore.locate().path) ?? "not found")
+                    Text((try? FirmwareStore.locate().path) ?? String(localized: "not found"))
                         .textSelection(.enabled)
                 }
                 if let dir = model.recordingsDirectory {

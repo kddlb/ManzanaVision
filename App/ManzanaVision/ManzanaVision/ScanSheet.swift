@@ -79,13 +79,13 @@ struct ScanRow: View {
                 VStack(alignment: .leading) {
                     Text(mux.services.map { "\($0.virtual) \($0.name)" }.joined(separator: " · "))
                         .lineLimit(2)
-                    Text([mux.signal.snr > 0 ? String(format: "SNR %.1f dB", mux.signal.snr) : nil,
-                          mux.hasPAT ? nil : "HD layer not decoding"].compactMap { $0 }.joined(separator: " · "))
+                    Text([mux.signal.snr > 0 ? String(localized: "SNR \(mux.signal.snr, specifier: "%.1f") dB") : nil,
+                          mux.hasPAT ? nil : String(localized: "HD layer not decoding")].compactMap { $0 }.joined(separator: " · "))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
                 Image(systemName: "minus.circle").foregroundStyle(.secondary)
-                Text(mux.signal.hasSignal ? "Signal, no lock" : "Nothing").foregroundStyle(.secondary)
+                Text(mux.signal.hasSignal ? "Signal, no lock" : LocalizedStringKey("Nothing")).foregroundStyle(.secondary)
             }
         }
     }

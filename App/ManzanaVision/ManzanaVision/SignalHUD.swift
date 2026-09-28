@@ -15,15 +15,15 @@ struct SignalHUD: View {
                 Text("\(c.virtual) \(c.name) · RF \(c.rf)").font(.headline)
             }
             if let sig = model.signal {
-                meter("SNR", value: sig.snr, max: 30, text: String(format: "%.1f dB", sig.snr))
+                meter("SNR", value: sig.snr, max: 30, text: "\(sig.snr, specifier: "%.1f") dB")
                 meter("Level", value: Double(sig.strengthPercent), max: 100, text: "\(sig.strengthPercent)%")
                 HStack(spacing: 6) {
-                    Text("Layers").frame(width: 58, alignment: .leading).foregroundStyle(.secondary)
+                    Text("Layers").frame(width: 84, alignment: .leading).foregroundStyle(.secondary)
                     ForEach(0..<3, id: \.self) { l in
                         layerChip(l, locked: sig.layerLocked(l))
                     }
                 }
-                row("Errors", String(format: "%.0f packets/s", sig.errorsPerSecond))
+                row("Errors", "\(sig.errorsPerSecond, specifier: "%.0f") packets/s")
             } else {
                 row("Signal", "—")
             }
@@ -31,15 +31,15 @@ struct SignalHUD: View {
                 row("TMCC", "mode \(t.mode), GI \(t.guardInterval)")
             }
             Divider()
-            row("Video", videoText(s))
-            row("Audio", s.audioDescription.isEmpty ? "—" : s.audioDescription)
-            row("Buffer", String(format: "video %.1f s, audio %.1f s", s.videoBuffer, s.audioBuffer))
+            row("Video", "\(videoText(s))")
+            row("Audio", "\(s.audioDescription.isEmpty ? "—" : s.audioDescription)")
+            row("Buffer", "video \(s.videoBuffer, specifier: "%.1f") s, audio \(s.audioBuffer, specifier: "%.1f") s")
             row("Damage", "\(s.continuityErrors) CC errors, \(s.decodeErrors) decode errors")
             row("Recovery", "\(s.restarts) restarts, \(s.stalls) stalls, \(s.rebuffers) rebuffers")
         }
         .font(.caption.monospacedDigit())
         .padding(12)
-        .frame(width: 330)
+        .frame(width: 360)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
 
@@ -48,21 +48,21 @@ struct SignalHUD: View {
         var text = "\(Int(s.videoSize.width))×\(Int(s.videoSize.height))\(s.interlaced ? "i" : "p")"
         if s.deinterlace != .off {
             text += " · \(s.deinterlace.rawValue)"
-            if s.deinterlaceGPUms > 0 { text += String(format: " %.1f ms", s.deinterlaceGPUms) }
+            if s.deinterlaceGPUms > 0 { text += String(format: " %.1f ms", locale: .current, s.deinterlaceGPUms) }
         }
         return text
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
+    private func row(_ label: LocalizedStringKey, _ value: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label).frame(width: 58, alignment: .leading).foregroundStyle(.secondary)
+            Text(label).frame(width: 84, alignment: .leading).foregroundStyle(.secondary)
             Text(value)
         }
     }
 
-    private func meter(_ label: String, value: Double, max: Double, text: String) -> some View {
+    private func meter(_ label: LocalizedStringKey, value: Double, max: Double, text: LocalizedStringKey) -> some View {
         HStack {
-            Text(label).frame(width: 58, alignment: .leading).foregroundStyle(.secondary)
+            Text(label).frame(width: 84, alignment: .leading).foregroundStyle(.secondary)
             ProgressView(value: min(Swift.max(value, 0), max), total: max)
                 .progressViewStyle(.linear)
             Text(text).frame(width: 64, alignment: .trailing)

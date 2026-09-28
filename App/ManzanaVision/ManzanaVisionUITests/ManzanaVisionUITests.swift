@@ -5,17 +5,24 @@ import XCTest
 /// Screenshots of each step are kept in the test results.
 final class ManzanaVisionUITests: XCTestCase {
     var app: XCUIApplication!
+    var recordings = ""
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        let dir = ProcessInfo.processInfo.environment["MANZANA_RECORDINGS"]
+        recordings = ProcessInfo.processInfo.environment["MANZANA_RECORDINGS"]
             ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent()
                 .appendingPathComponent("../../../fixtures").standardized.path
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: dir + "/rf27-5min-20s.ts"),
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: recordings + "/rf27-5min-20s.ts"),
                           "needs fixture recordings (scripts/make-fixtures.sh)")
+    }
+
+    /// Starts the app on 9.1 in the given language (the tests find controls by their English labels)
+    private func launch(language: String = "en") {
+        app?.terminate()
         app = XCUIApplication()
-        app.launchEnvironment["MANZANA_RECORDINGS"] = dir
-        app.launchArguments += ["-showOneSeg", "NO", "-lastRecordedChannel", "27:9728", "-showHUD", "NO", "-ApplePersistenceIgnoreState", "YES"]
+        app.launchEnvironment["MANZANA_RECORDINGS"] = recordings
+        app.launchArguments += ["-showOneSeg", "NO", "-lastRecordedChannel", "27:9728", "-showHUD", "NO",
+                                "-ApplePersistenceIgnoreState", "YES", "-AppleLanguages", "(\(language))"]
         app.launch()
     }
 
@@ -38,6 +45,7 @@ final class ManzanaVisionUITests: XCTestCase {
     }
 
     func testChannelListAndPlayback() throws {
+        launch()
         XCTAssertTrue(window.staticTexts["MEGA HD"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(window.staticTexts["Tevex"].exists)
         XCTAssertFalse(window.staticTexts["MEGA MOVIL"].exists, "one-seg hidden by default")
@@ -47,6 +55,7 @@ final class ManzanaVisionUITests: XCTestCase {
     }
 
     func testZapAndNumericEntry() throws {
+        launch()
         XCTAssertTrue(waitForTitle("9.1"))
         window.typeKey(.downArrow, modifierFlags: .command)
         XCTAssertTrue(waitForTitle("9.2"), "⌘↓ goes to the next channel")
@@ -59,6 +68,7 @@ final class ManzanaVisionUITests: XCTestCase {
     }
 
     func testSignalHUD() throws {
+        launch()
         XCTAssertTrue(waitForTitle("9.1"))
         sleep(3)
         window.typeKey("i", modifierFlags: .command)
@@ -68,6 +78,7 @@ final class ManzanaVisionUITests: XCTestCase {
     }
 
     func testScanSheet() throws {
+        launch()
         XCTAssertTrue(waitForTitle("9.1"))
         window.buttons["Scan"].firstMatch.click()
         let sheet = window.sheets.firstMatch
@@ -78,5 +89,23 @@ final class ManzanaVisionUITests: XCTestCase {
         snapshot("6 scan results")
         sheet.buttons["Done"].click()
         XCTAssertTrue(waitForTitle("9.1"), "playback resumes after the scan")
+    }
+
+    /// The HUD and scan sheet in Spanish and Portuguese, for checking the translations fit
+    func testLocalizations() throws {
+        for (language, layers, scan, scanTitle) in [("es", "Capas", "Buscar", "Buscar canales"),
+                                                    ("pt-BR", "Camadas", "Buscar", "Buscar canais")] {
+            launch(language: language)
+            XCTAssertTrue(waitForTitle("9.1"))
+            window.typeKey("i", modifierFlags: .command)
+            XCTAssertTrue(window.staticTexts[layers].waitForExistence(timeout: 5), "\(language) HUD")
+            sleep(3)
+            snapshot("\(language) playing with HUD")
+            window.buttons[scan].firstMatch.click()
+            let sheet = window.sheets.firstMatch
+            XCTAssertTrue(sheet.staticTexts[scanTitle].waitForExistence(timeout: 5), "\(language) scan sheet")
+            snapshot("\(language) scan sheet")
+            sheet.typeKey(.escape, modifierFlags: [])
+        }
     }
 }

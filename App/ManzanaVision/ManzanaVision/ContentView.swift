@@ -81,7 +81,7 @@ struct ChannelRow: View {
         }
     }
 
-    private var badge: String? {
+    private var badge: LocalizedStringKey? {
         switch channel.kind {
         case "1seg": "1SEG"
         case "radio": "RADIO"

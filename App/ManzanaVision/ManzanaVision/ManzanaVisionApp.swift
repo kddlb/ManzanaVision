@@ -21,7 +21,7 @@ struct ManzanaVisionApp: App {
                 Button("Previous Channel") { model.step(-1) }
                     .keyboardShortcut(.upArrow, modifiers: .command)
                 Divider()
-                Button(model.showHUD ? "Hide Signal Info" : "Show Signal Info") { model.showHUD.toggle() }
+                Button(model.showHUD ? LocalizedStringKey("Hide Signal Info") : "Show Signal Info") { model.showHUD.toggle() }
                     .keyboardShortcut("i", modifiers: .command)
                 Button("Picture in Picture") { pip.toggle() }
                     .keyboardShortcut("p", modifiers: [.command, .control])

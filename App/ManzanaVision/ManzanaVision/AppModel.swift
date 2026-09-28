@@ -201,7 +201,7 @@ final class AppModel {
                     model.apply(p)
                 }
             } catch {
-                model.failure = "\(error)"
+                model.failure = errorMessage(error)
             }
             model.running = false
             reloadChannels()
@@ -257,5 +257,18 @@ final class ScanModel {
     func cancel() {
         task?.cancel()
         running = false
+    }
+}
+
+/// A scan or tuner failure, in the user's language
+func errorMessage(_ error: any Error) -> String {
+    guard let error = error as? TunerError else { return error.localizedDescription }
+    return switch error {
+    case .noDevice, .gone: String(localized: "The tuner isn't plugged in.")
+    case .busy: String(localized: "Another program is using the tuner.")
+    case .firmware(let why): firmwareMessage(why)
+    case .noLock: String(localized: "No signal.")
+    case .cancelled: String(localized: "Cancelled.")
+    case .io, .noFrontend, .invalid, .notOpen: String(localized: "The tuner stopped responding. Unplug it and plug it back in.")
     }
 }

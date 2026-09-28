@@ -67,19 +67,19 @@ struct StatusOverlay: View {
                 EmptyView()
             case .noTuner:
                 panel("Plug In Your Tuner", "cable.connector",
-                      "ManzanaVision plays TV from a DiBcom STK8096GP USB tuner. Connect it to start watching.")
+                      Text("ManzanaVision plays TV from a DiBcom STK8096GP USB tuner. Connect it to start watching."))
             case .tunerBusy:
                 panel("Tuner In Use", "exclamationmark.lock",
-                      "Another program is using the tuner (for example the manzanavision command-line tool). Close it to watch here.")
+                      Text("Another program is using the tuner (for example the manzanavision command-line tool). Close it to watch here."))
             case .firmwareProblem(let why):
-                panel("Tuner Firmware Problem", "exclamationmark.triangle", why.capitalizedFirst)
+                panel("Tuner Firmware Problem", "exclamationmark.triangle", Text(firmwareMessage(why)))
             case .starting:
                 progress("Starting the tuner…")
             case .tuning(let c):
                 progress("Tuning \(c.virtual) \(c.name)…")
             case .noSignal(let c):
                 panel("No Signal", "antenna.radiowaves.left.and.right.slash",
-                      "Nothing is being received on RF \(c.rf). Check the antenna, or scan again.")
+                      Text("Nothing is being received on RF \(c.rf). Check the antenna, or scan again."))
             case .signalLost:
                 // the last picture stays up; say why it's frozen
                 VStack {
@@ -91,7 +91,7 @@ struct StatusOverlay: View {
                 }
             case .disconnected:
                 panel("Tuner Unplugged", "cable.connector.slash",
-                      "Plug the tuner back in to continue watching.")
+                      Text("Plug the tuner back in to continue watching."))
             case .scanning(let rf):
                 progress("Scanning RF \(rf)…")
             case .stopped:
@@ -110,13 +110,13 @@ struct StatusOverlay: View {
         .animation(.default, value: model.status)
     }
 
-    private func panel(_ title: String, _ symbol: String, _ text: String) -> some View {
-        ContentUnavailableView(title, systemImage: symbol, description: Text(text))
+    private func panel(_ title: LocalizedStringKey, _ symbol: String, _ text: Text) -> some View {
+        ContentUnavailableView(title, systemImage: symbol, description: text)
             .foregroundStyle(.white)
             .background(.black.opacity(0.6))
     }
 
-    private func progress(_ text: String) -> some View {
+    private func progress(_ text: LocalizedStringKey) -> some View {
         VStack(spacing: 12) {
             ProgressView().controlSize(.large)
             Text(text).foregroundStyle(.white)
@@ -159,7 +159,7 @@ struct ReceptionBadge: View {
     var body: some View {
         if case .playing(_, let r) = model.status, r != .good {
             HStack {
-                Label(r == .poor ? "Poor reception" : "Weak reception",
+                Label(r == .poor ? LocalizedStringKey("Poor reception") : "Weak reception",
                       systemImage: r == .poor ? "wifi.exclamationmark" : "wifi")
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -171,6 +171,16 @@ struct ReceptionBadge: View {
     }
 }
 
-extension String {
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+/// FirmwareStore and the core report these in English; say them in the user's language
+func firmwareMessage(_ why: String) -> String {
+    switch why {
+    case "firmware file not found":
+        String(localized: "The tuner firmware file is missing. Reinstall ManzanaVision.")
+    case "firmware file doesn't match the expected checksum":
+        String(localized: "The tuner firmware file is damaged. Reinstall ManzanaVision.")
+    case "rejected by the tuner":
+        String(localized: "The tuner rejected its firmware. Unplug it and plug it back in.")
+    default:
+        why
+    }
 }
