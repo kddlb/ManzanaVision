@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "ManzanaCore", targets: ["ManzanaCore"]),
         .library(name: "ManzanaStream", targets: ["ManzanaStream"]),
+        .library(name: "ManzanaPlayback", targets: ["ManzanaPlayback"]),
     ],
     targets: [
         // libusb 1.0.30, macOS backend only, built from source so the app
@@ -47,9 +48,14 @@ let package = Package(
         ),
         // Pure-Swift MPEG-TS/PES demux and H.264/AAC parsing (no Apple media frameworks)
         .target(name: "ManzanaStream"),
+        // CoreMedia/VideoToolbox/AVFoundation playback on top of ManzanaStream
+        .target(
+            name: "ManzanaPlayback",
+            dependencies: ["ManzanaStream", "ManzanaCore"]
+        ),
         .executableTarget(
             name: "mzvtool",
-            dependencies: ["ManzanaCore", "ManzanaStream"]
+            dependencies: ["ManzanaCore", "ManzanaStream", "ManzanaPlayback"]
         ),
         .testTarget(
             name: "ManzanaCoreTests",
@@ -58,6 +64,10 @@ let package = Package(
         .testTarget(
             name: "ManzanaStreamTests",
             dependencies: ["ManzanaStream", "ManzanaCore"]
+        ),
+        .testTarget(
+            name: "ManzanaPlaybackTests",
+            dependencies: ["ManzanaPlayback", "ManzanaStream"]
         ),
     ],
     cLanguageStandard: .gnu11

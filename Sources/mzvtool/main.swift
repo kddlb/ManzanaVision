@@ -2,6 +2,7 @@
 // mzvtool: developer tool for the app's media pipeline.
 //   mzvtool version
 //   mzvtool probe FILE.ts      per-service stream analysis of a recording
+//   mzvtool play FILE.ts ...   plays a service in a window, paced like live
 import Foundation
 import ManzanaCore
 import ManzanaStream
@@ -146,12 +147,14 @@ let args = CommandLine.arguments
 switch args.count > 1 ? args[1] : "" {
 case "version":
     print("ManzanaCore \(String(cString: mzv_version()))")
+case "play":
+    MainActor.assumeIsolated { play(Array(args.dropFirst(2))) }
 case "probe" where args.count > 2:
     do { try probe(args[2]) } catch {
         FileHandle.standardError.write("\(error)\n".data(using: .utf8)!)
         exit(1)
     }
 default:
-    FileHandle.standardError.write("usage: mzvtool version | probe FILE.ts\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: mzvtool version | probe FILE.ts | play FILE.ts [--service 9.1] [--seconds N] [--snapshots DIR]\n".data(using: .utf8)!)
     exit(2)
 }

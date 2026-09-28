@@ -126,6 +126,30 @@ public struct AudioSpecificConfig: Sendable, Equatable {
     }
 }
 
+/// Frame timestamps from the last PES anchor plus an exact frame count, so
+/// rates like 44.1 kHz (2089.8 ticks per frame) don't accumulate truncation
+struct FrameClock {
+    private var anchor: Int64?
+    private var framesSinceAnchor: Int64 = 0
+
+    mutating func reset() {
+        anchor = nil
+        framesSinceAnchor = 0
+    }
+
+    /// Timestamp for the next frame; pesPTS (if any) re-anchors
+    mutating func next(pesPTS: Int64?, samplesPerFrame: Int, sampleRate: Int) -> Int64? {
+        if let p = pesPTS {
+            anchor = p
+            framesSinceAnchor = 0
+        }
+        guard let a = anchor else { return nil }
+        let pts = a + framesSinceAnchor * Int64(samplesPerFrame) * 90000 / Int64(sampleRate)
+        framesSinceAnchor += 1
+        return pts
+    }
+}
+
 public struct AACFrame: Sendable {
     public var data: [UInt8]         // raw_data_block(s)
     public var pts: Int64?           // unwrapped 90 kHz
@@ -137,7 +161,7 @@ public struct AACFrame: Sendable {
 public struct ADTSParser {
     private var carry: [UInt8] = []
     private var ptsUnwrap = TimestampUnwrapper()
-    private var nextPTS: Int64?
+    private var clock = FrameClock()
     public private(set) var frames = 0
     public private(set) var syncLosses = 0
 
@@ -146,7 +170,7 @@ public struct ADTSParser {
     public mutating func reset() {
         carry.removeAll()
         ptsUnwrap.reset()
-        nextPTS = nil
+        clock.reset()
     }
 
     public mutating func feed(_ pes: PESPacket) -> [AACFrame] {
@@ -177,9 +201,7 @@ public struct ADTSParser {
             guard i + length <= b.count else { break }
             let cfg = AudioSpecificConfig(objectType: profile + 1, sampleRate: aacSampleRates[rateIndex],
                                           channelConfig: chan)
-            let step = Int64(1024 * blocks) * 90000 / Int64(cfg.sampleRate)
-            let pts = pesPTS ?? nextPTS
-            if let p = pts { nextPTS = p + step }
+            let pts = clock.next(pesPTS: pesPTS, samplesPerFrame: 1024 * blocks, sampleRate: cfg.sampleRate)
             out.append(AACFrame(data: Array(b[(i + header)..<(i + length)]), pts: pts, config: cfg,
                                 damaged: pes.damaged))
             pesPTS = nil
@@ -195,7 +217,7 @@ public struct ADTSParser {
 public struct LATMParser {
     private var carry: [UInt8] = []
     private var ptsUnwrap = TimestampUnwrapper()
-    private var nextPTS: Int64?
+    private var clock = FrameClock()
     public private(set) var config: AudioSpecificConfig?
     private var frameLengthType = 0
     private var otherDataPresent = false
@@ -213,7 +235,7 @@ public struct LATMParser {
     public mutating func reset() {
         carry.removeAll()
         ptsUnwrap.reset()
-        nextPTS = nil
+        clock.reset()
     }
 
     public mutating func feed(_ pes: PESPacket) -> [AACFrame] {
@@ -236,9 +258,7 @@ public struct LATMParser {
                     skippedWithoutConfig += 1
                     continue
                 }
-                let step = Int64(cfg.samplesPerFrame) * 90000 / Int64(cfg.sampleRate)
-                let pts = pesPTS ?? nextPTS
-                if let p = pts { nextPTS = p + step }
+                let pts = clock.next(pesPTS: pesPTS, samplesPerFrame: cfg.samplesPerFrame, sampleRate: cfg.sampleRate)
                 out.append(AACFrame(data: payload, pts: pts, config: cfg, damaged: pes.damaged))
                 pesPTS = nil
                 frames += 1
