@@ -47,9 +47,11 @@ int dib0700_ctrl_clock(struct dib0700 *d, u32 clk_MHz, u8 clock_out_gp3);
 int dib0700_streaming_ctrl(struct dib0700 *d, int onoff);
 
 /*
- * Reads TS from the stream endpoint for up to timeout_ms and hands every
- * aligned 188-byte packet to cb. Stops early if cb returns non-zero.
- * Returns the number of packets delivered, or a negative libusb error.
+ * Reads TS from the stream endpoint for up to timeout_ms (0 = no limit) and
+ * hands every aligned 188-byte packet to cb. Every ~50 ms cb is also called
+ * with pkt == NULL, so it can stop the read even while no data arrives.
+ * Stops as soon as cb returns non-zero. Returns the number of packets
+ * delivered, or a negative libusb error.
  */
 typedef int (*dib0700_ts_cb)(const u8 *pkt, void *opaque);
 int dib0700_read_ts(struct dib0700 *d, unsigned int timeout_ms, dib0700_ts_cb cb, void *opaque);

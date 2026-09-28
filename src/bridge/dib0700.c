@@ -409,10 +409,12 @@ int dib0700_read_ts(struct dib0700 *d, unsigned int timeout_ms, dib0700_ts_cb cb
 			rc.in_flight++;
 	}
 
-	while (!rc.stop && time_before(jiffies, deadline)) {
+	while (!rc.stop && (!timeout_ms || time_before(jiffies, deadline))) {
 		struct timeval tv = { .tv_sec = 0, .tv_usec = 50000 };
 
 		libusb_handle_events_timeout_completed(d->ctx, &tv, NULL);
+		if (!rc.stop && cb(NULL, opaque))
+			rc.stop = 1;
 	}
 
 	rc.stop = 1;

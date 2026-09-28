@@ -10,6 +10,7 @@
 #include "meter.h"
 #include "scan.h"
 #include "stk8096gp.h"
+#include "watch.h"
 
 void kcompat_set_debug(int level);
 
@@ -22,14 +23,21 @@ static void usage(void)
 		"\n"
 		"commands:\n"
 		"  probe                          bring up the stick and identify the chips\n"
-		"  scan [--from N] [--to N] [--json] [--psi-timeout MS]\n"
-		"                                 scan UHF channels (default 14-51)\n"
+		"  scan [--from N] [--to N] [--json] [--psi-timeout MS] [--no-save]\n"
+		"                                 scan UHF channels (default 14-51) and save\n"
+		"                                 what was found to the channel list\n"
+		"  channels                       show the saved channel list\n"
+		"  watch <9.1|9|name> [--output FILE]\n"
+		"                                 stream one channel as MPEG-TS to stdout,\n"
+		"                                 e.g. manzanavision watch 9.1 | ffplay -\n"
 		"  tune <rf> [--dump FILE] [--seconds N]\n"
 		"                                 tune one channel, optionally capture TS\n"
 		"  signal <rf> [--beep]           live signal meter for aiming an antenna;\n"
 		"                                 --beep plays a tone whose pitch follows SNR\n"
 		"\n"
-		"The bridge firmware is read from $MANZANA_FIRMWARE or " DEFAULT_FIRMWARE ".\n");
+		"The bridge firmware is read from $MANZANA_FIRMWARE or " DEFAULT_FIRMWARE ".\n"
+		"The channel list lives in $MANZANA_CHANNELS or\n"
+		"~/Library/Application Support/ManzanaVision/channels.tsv.\n");
 }
 
 static void on_sigint(int sig)
@@ -48,12 +56,14 @@ int main(int argc, char **argv)
 		{ "dump", required_argument, NULL, 'd' },
 		{ "seconds", required_argument, NULL, 's' },
 		{ "beep", no_argument, NULL, 'b' },
+		{ "no-save", no_argument, NULL, 'n' },
+		{ "output", required_argument, NULL, 'o' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "help", no_argument, NULL, 'h' },
 		{ 0 }
 	};
-	struct scan_opts so = { .from = 14, .to = 51, .psi_timeout_ms = 5000 };
-	const char *dump = NULL, *fw, *cmd;
+	struct scan_opts so = { .from = 14, .to = 51, .psi_timeout_ms = 5000, .save = true };
+	const char *dump = NULL, *output = NULL, *query = NULL, *fw, *cmd;
 	unsigned int seconds = 10;
 	int verbose = 0, c, ret, rf = 0;
 	bool beep = false;
@@ -77,6 +87,12 @@ int main(int argc, char **argv)
 			return 2;
 		}
 		rf = atoi(argv[optind++]);
+	} else if (!strcmp(cmd, "watch")) {
+		if (optind >= argc) {
+			usage();
+			return 2;
+		}
+		query = argv[optind++];
 	}
 	while ((c = getopt_long(argc, argv, "v", longopts, NULL)) != -1) {
 		switch (c) {
@@ -87,14 +103,19 @@ int main(int argc, char **argv)
 		case 'd': dump = optarg; break;
 		case 's': seconds = atoi(optarg); break;
 		case 'b': beep = true; break;
+		case 'n': so.save = false; break;
+		case 'o': output = optarg; break;
 		case 'v': verbose++; break;
 		default: usage(); return 2;
 		}
 	}
-	if (strcmp(cmd, "probe") && strcmp(cmd, "scan") && strcmp(cmd, "tune") && strcmp(cmd, "signal")) {
+	if (strcmp(cmd, "probe") && strcmp(cmd, "scan") && strcmp(cmd, "tune") && strcmp(cmd, "signal") &&
+	    strcmp(cmd, "watch") && strcmp(cmd, "channels")) {
 		usage();
 		return 2;
 	}
+	if (!strcmp(cmd, "channels"))
+		return channels_run(); /* no hardware needed */
 	if ((rf && (rf < 14 || rf > 69)) || so.from < 14 || so.to > 69 || so.from > so.to) {
 		fprintf(stderr, "UHF channels are 14-69\n");
 		return 2;
@@ -122,6 +143,8 @@ int main(int argc, char **argv)
 		ret = tune_run(d, rf, dump, seconds);
 	else if (!strcmp(cmd, "signal"))
 		ret = meter_run(d, rf, beep);
+	else if (!strcmp(cmd, "watch"))
+		ret = watch_run(d, query, output);
 	else
 		ret = 0;
 

@@ -48,7 +48,9 @@ The firmware is not included in the repository. The script downloads it from lin
 
 ```sh
 ./manzanavision probe                  # upload firmware, identify the chips
-./manzanavision scan                   # scan UHF 14–51
+./manzanavision scan                   # scan UHF 14–51 and save the channel list
+./manzanavision channels               # show saved channels
+./manzanavision watch 9.1 | ffplay -   # watch a channel (also: watch 9, watch "MEGA HD")
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # tune one channel and list its services
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
@@ -56,6 +58,8 @@ The firmware is not included in the repository. The script downloads it from lin
 ```
 
 `signal` redraws SNR, level, per-layer lock and uncorrectable packets per second four times a second, and re-tunes if the lock drops. With `--beep` it plays a finder tone like a satellite receiver's: the pitch rises with SNR, steady when every layer is locked, pulsing when only some are, and silent with no lock. You can aim the antenna by ear.
+
+`scan` merges what it finds into `~/Library/Application Support/ManzanaVision/channels.tsv` (override with `MANZANA_CHANNELS`), a plain tab-separated file you can read or edit. A mux that doesn't lock on a later scan keeps its saved channels. `watch` tunes a saved channel and writes just that program as MPEG-TS, with a PAT listing only that service, its PMT and its streams, so ffplay, mpv or VLC (`| /Applications/VLC.app/Contents/MacOS/VLC -`) open it without any flags. Use `--output FILE` to record instead. If the signal drops for 2 seconds, `watch` re-tunes on its own and resumes, and the player just sees a short gap. It stops when the player exits or on Ctrl-C.
 
 `-v` turns on the drivers' debug log and `-vv` adds an I²C trace. Put them before the command, for example `./manzanavision -v tune 27`.
 
@@ -88,7 +92,7 @@ Notes from bringing it up on real hardware:
 
 ## Status
 
-The MVP works: on the author's stick the scanner locks and lists services on every mux that has usable signal, and TS captures are lossless (17.3 Mbit/s, no continuity errors). Next steps could include live playback, EPG and a Mac app.
+The MVP works: on the author's stick the scanner locks and lists services on every mux that has usable signal, and TS captures are lossless (17.3 Mbit/s, no continuity errors). Live viewing works by piping `watch` into a player. Next steps could include an EPG, serving channels on the network as an HDHomeRun-compatible tuner, and a Mac app.
 
 ## License
 

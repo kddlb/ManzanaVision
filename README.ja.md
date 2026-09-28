@@ -51,7 +51,9 @@ scripts/fetch-firmware.sh   # linux-firmware から dvb-usb-dib0700-1.20.fw を�
 
 ```sh
 ./manzanavision probe                  # ファームウェアを転送し、チップを識別
-./manzanavision scan                   # UHF 14–51 をスキャン
+./manzanavision scan                   # UHF 14–51 をスキャンし、チャンネルリストを保存
+./manzanavision channels               # 保存済みチャンネルを表示
+./manzanavision watch 9.1 | ffplay -   # チャンネルを視聴（watch 9、watch "MEGA HD" も可）
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # 1 チャンネルを選局し、サービスを一覧表示
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
@@ -59,6 +61,8 @@ scripts/fetch-firmware.sh   # linux-firmware から dvb-usb-dib0700-1.20.fw を�
 ```
 
 `signal` は、SNR、信号レベル、各階層のロック状態、訂正不能パケット数（毎秒）を 1 秒に 4 回更新し、ロックが外れると自動で再選局します。`--beep` を付けると、衛星受信機のようなアンテナ調整音が鳴ります。音の高さは SNR に応じて上がり、全階層がロックしていれば連続音、一部だけなら断続音になり、ロックしていないときは鳴りません。耳だけでアンテナを調整できます。
+
+`scan` は見つかったチャンネルを `~/Library/Application Support/ManzanaVision/channels.tsv`（`MANZANA_CHANNELS` で変更可）に統合します。タブ区切りのテキストなので、読んだり手で編集したりできます。後のスキャンでロックしなかった多重のチャンネルは、そのまま残ります。`watch` は保存済みチャンネルを選局し、その番組だけを MPEG-TS として出力します。PAT はそのサービスだけを載せたものに書き換え、PMT と各ストリームだけを通すので、ffplay、mpv、VLC（`| /Applications/VLC.app/Contents/MacOS/VLC -`）でオプションなしに再生できます。`--output ファイル` を付けると、再生の代わりに録画します。信号が 2 秒間途切れると自動で再選局して配信を再開するので、プレーヤー側では短い途切れが生じるだけです。プレーヤーを閉じるか Ctrl-C で停止します。
 
 `-v` でドライバーのデバッグログを、`-vv` でさらに I²C のトレースを出力します。これらはコマンドの前に付けます（例：`./manzanavision -v tune 27`）。
 
@@ -89,7 +93,7 @@ src/scan.c      選局 → TMCC 読み出し → PSI 収集 → 表示
 
 ## 状況
 
-MVP は動作しています。作者の環境では、実用的な信号がある多重はすべてロックしてサービスを一覧表示でき、TS のキャプチャーも欠落なしで取得できています（17.3 Mbit/s、連続性エラーなし）。今後の候補は、ライブ再生、EPG、Mac アプリです。
+MVP は動作しています。作者の環境では、実用的な信号がある多重はすべてロックしてサービスを一覧表示でき、TS のキャプチャーも欠落なしで取得できています（17.3 Mbit/s、連続性エラーなし）。`watch` の出力をプレーヤーに渡せば、ライブ視聴ができます。今後の候補は、EPG（番組表）、HDHomeRun 互換チューナーとしてのネットワーク配信、Mac アプリです。
 
 ## ライセンス
 

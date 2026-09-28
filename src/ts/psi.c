@@ -15,6 +15,7 @@
 #define PID_SDT 0x0011
 
 #define TID_PAT 0x00
+#define TID_PMT 0x02
 #define TID_NIT_ACTUAL 0x40
 #define TID_SDT_ACTUAL 0x42
 
@@ -40,8 +41,9 @@ struct table_state {
 };
 
 struct psi_parser {
-	struct section_buf pat_buf, nit_buf, sdt_buf;
+	struct section_buf pat_buf, nit_buf, sdt_buf, pmt_buf;
 	struct table_state pat, nit, sdt;
+	int pmt_version;	/* -1 until the first PMT */
 	struct psi_mux mux;
 };
 
@@ -71,6 +73,9 @@ struct psi_parser *psi_new(void)
 	p->sdt_buf.pid = PID_SDT;
 	p->pat_buf.cc = p->nit_buf.cc = p->sdt_buf.cc = -1;
 	p->pat.version = p->nit.version = p->sdt.version = -1;
+	p->pmt_buf.pid = 0xffff; /* not a real PID until the PAT names one */
+	p->pmt_buf.cc = -1;
+	p->pmt_version = -1;
 	return p;
 }
 
@@ -162,6 +167,41 @@ static bool table_mark(struct table_state *t, const uint8_t *sec)
 	return true;
 }
 
+void psi_watch_program(struct psi_parser *p, uint16_t program_number)
+{
+	memset(&p->mux.program, 0, sizeof(p->mux.program));
+	p->mux.program.program_number = program_number;
+	p->pmt_buf.pid = 0xffff;
+	p->pmt_buf.len = p->pmt_buf.need = 0;
+	p->pmt_buf.cc = -1;
+	p->pmt_version = -1;
+}
+
+static void parse_pmt(struct psi_parser *p, const uint8_t *sec, int len)
+{
+	struct psi_program *prog = &p->mux.program;
+	int version = (sec[5] >> 1) & 0x1f;
+	int pil, i;
+
+	if (((sec[3] << 8) | sec[4]) != prog->program_number || version == p->pmt_version)
+		return;
+	p->pmt_version = version;
+
+	prog->pcr_pid = ((sec[8] & 0x1f) << 8) | sec[9];
+	pil = ((sec[10] & 0x0f) << 8) | sec[11];
+	prog->nes = 0;
+	for (i = 12 + pil; i + 5 <= len - 4 && prog->nes < PSI_MAX_ES;) {
+		int esil = ((sec[i + 3] & 0x0f) << 8) | sec[i + 4];
+
+		prog->es[prog->nes].stream_type = sec[i];
+		prog->es[prog->nes].pid = ((sec[i + 1] & 0x1f) << 8) | sec[i + 2];
+		prog->nes++;
+		i += 5 + esil;
+	}
+	prog->have_pmt = true;
+	prog->generation++;
+}
+
 static void parse_pat(struct psi_parser *p, const uint8_t *sec, int len)
 {
 	struct psi_mux *m = &p->mux;
@@ -178,6 +218,14 @@ static void parse_pat(struct psi_parser *p, const uint8_t *sec, int len)
 		if (s) {
 			s->pmt_pid = pid;
 			s->in_pat = true;
+		}
+		/* follow the watched program's PMT to wherever the PAT says it is */
+		if (program == m->program.program_number && pid != p->pmt_buf.pid) {
+			m->program.pmt_pid = pid;
+			p->pmt_buf.pid = pid;
+			p->pmt_buf.len = p->pmt_buf.need = 0;
+			p->pmt_buf.cc = -1;
+			p->pmt_version = -1;
 		}
 	}
 	if (table_mark(&p->pat, sec))
@@ -290,6 +338,8 @@ static void section_done(struct psi_parser *p, struct section_buf *sb)
 		parse_sdt(p, sec, len);
 	else if (sb->pid == PID_NIT && sec[0] == TID_NIT_ACTUAL)
 		parse_nit(p, sec, len);
+	else if (sb->pid == p->pmt_buf.pid && sec[0] == TID_PMT)
+		parse_pmt(p, sec, len);
 }
 
 /* Appends payload bytes, emitting each completed section */
@@ -341,7 +391,11 @@ void psi_feed(struct psi_parser *p, const uint8_t *pkt)
 	case PID_PAT: sb = &p->pat_buf; break;
 	case PID_NIT: sb = &p->nit_buf; break;
 	case PID_SDT: sb = &p->sdt_buf; break;
-	default: return;
+	default:
+		if (pid != p->pmt_buf.pid)
+			return;
+		sb = &p->pmt_buf;
+		break;
 	}
 	if (!(afc & 1))
 		return; /* no payload */
@@ -373,14 +427,19 @@ void psi_feed(struct psi_parser *p, const uint8_t *pkt)
 
 bool psi_is_oneseg(const struct psi_service *s)
 {
-	return s->pmt_pid >= 0x1fc8 && s->pmt_pid <= 0x1fcf;
+	if (s->in_pat)
+		return s->pmt_pid >= 0x1fc8 && s->pmt_pid <= 0x1fcf;
+	/* no PAT: fall back to the NBR 15603 service_id type bits, or the SDT type */
+	return ((s->service_id >> 3) & 0x3) == 3 || s->service_type == 0xc0;
 }
 
 void psi_virtual_channel(const struct psi_mux *m, const struct psi_service *s, int *major, int *minor)
 {
 	*major = m->remote_control_key_id;
-	if (psi_is_oneseg(s))
+	if (!psi_is_oneseg(s))
+		*minor = (s->service_id & 0x7) + 1;
+	else if (s->in_pat)
 		*minor = 31 + (s->pmt_pid - 0x1fc8);
 	else
-		*minor = (s->service_id & 0x7) + 1;
+		*minor = 31 + (s->service_id & 0x7);
 }

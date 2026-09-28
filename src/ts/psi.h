@@ -18,6 +18,22 @@ struct psi_service {
 	char provider[64];	/* UTF-8 */
 };
 
+#define PSI_MAX_ES 32
+
+/* PMT of the program selected with psi_watch_program() */
+struct psi_program {
+	uint16_t program_number;	/* 0 = none selected */
+	uint16_t pmt_pid;		/* from the live PAT, 0 until known */
+	bool have_pmt;
+	unsigned int generation;	/* bumps on every new PMT version */
+	uint16_t pcr_pid;
+	int nes;
+	struct {
+		uint8_t stream_type;
+		uint16_t pid;
+	} es[PSI_MAX_ES];
+};
+
 struct psi_mux {
 	bool have_pat;
 	bool have_sdt;
@@ -32,12 +48,17 @@ struct psi_mux {
 
 	int nservices;
 	struct psi_service services[PSI_MAX_SERVICES];
+
+	struct psi_program program;
 };
 
 struct psi_parser;
 
 struct psi_parser *psi_new(void);
 void psi_free(struct psi_parser *p);
+
+/* Also follows the PMT of this program (its PID is taken from the PAT) */
+void psi_watch_program(struct psi_parser *p, uint16_t program_number);
 
 /* Feeds one 188-byte TS packet */
 void psi_feed(struct psi_parser *p, const uint8_t *pkt);
@@ -47,7 +68,10 @@ bool psi_complete(const struct psi_parser *p);
 
 const struct psi_mux *psi_result(const struct psi_parser *p);
 
-/* One-seg services carry their PMT on 0x1FC8..0x1FCF (ARIB TR-B14) */
+/*
+ * One-seg services carry their PMT on 0x1FC8..0x1FCF (ARIB TR-B14). Without
+ * a PAT, falls back to the service_id type bits or SDT service type 0xC0.
+ */
 bool psi_is_oneseg(const struct psi_service *s);
 
 /*

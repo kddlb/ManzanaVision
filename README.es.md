@@ -48,7 +48,9 @@ El firmware no viene en el repositorio. El script lo descarga desde linux-firmwa
 
 ```sh
 ./manzanavision probe                  # carga el firmware e identifica los chips
-./manzanavision scan                   # escanea UHF 14–51
+./manzanavision scan                   # escanea UHF 14–51 y guarda la lista de canales
+./manzanavision channels               # muestra los canales guardados
+./manzanavision watch 9.1 | ffplay -   # ver un canal (también: watch 9, watch "MEGA HD")
 ./manzanavision scan --from 20 --to 40 --json
 ./manzanavision tune 27                # sintoniza un canal y lista sus servicios
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
@@ -56,6 +58,8 @@ El firmware no viene en el repositorio. El script lo descarga desde linux-firmwa
 ```
 
 `signal` actualiza cuatro veces por segundo el SNR, el nivel, el enganche de cada capa y los paquetes con errores incorregibles por segundo, y vuelve a sintonizar si se pierde el enganche. Con `--beep` emite un tono como el de los decodificadores satelitales: el tono sube con el SNR, es continuo cuando todas las capas enganchan, intermitente cuando solo algunas lo hacen y se calla si no hay enganche. Así puedes orientar la antena de oído.
+
+`scan` combina lo que encuentra en `~/Library/Application Support/ManzanaVision/channels.tsv` (se puede cambiar con `MANZANA_CHANNELS`), un archivo de texto separado por tabulaciones que puedes leer o editar. Si un múltiplex no engancha en un escaneo posterior, conserva sus canales guardados. `watch` sintoniza un canal guardado y escribe solo ese programa como MPEG-TS, con una PAT que lista únicamente ese servicio, su PMT y sus streams, así que ffplay, mpv o VLC (`| /Applications/VLC.app/Contents/MacOS/VLC -`) lo abren sin opciones extra. Con `--output ARCHIVO` lo graba en vez de reproducirlo. Si la señal se pierde por 2 segundos, `watch` vuelve a sintonizar solo y continúa, y el reproductor solo ve un corte breve. Se detiene cuando se cierra el reproductor o con Ctrl-C.
 
 `-v` activa el log de depuración de los drivers y `-vv` agrega una traza de I²C. Van antes del comando, por ejemplo `./manzanavision -v tune 27`.
 
@@ -88,7 +92,7 @@ Notas de la puesta en marcha con el hardware real:
 
 ## Estado
 
-El MVP funciona: en el dispositivo del autor el escáner engancha y lista los servicios de cada múltiplex con señal utilizable, y las capturas de TS salen sin pérdidas (17,3 Mbit/s, sin errores de continuidad). Los siguientes pasos podrían ser reproducción en vivo, EPG y una app para Mac.
+El MVP funciona: en el dispositivo del autor el escáner engancha y lista los servicios de cada múltiplex con señal utilizable, y las capturas de TS salen sin pérdidas (17,3 Mbit/s, sin errores de continuidad). Ya se puede ver TV en vivo conectando `watch` a un reproductor. Los siguientes pasos podrían ser una guía de programación (EPG), servir los canales en la red como un sintonizador compatible con HDHomeRun y una app para Mac.
 
 ## Licencia
 

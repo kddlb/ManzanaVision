@@ -13,6 +13,7 @@ struct scan_opts {
 	int from, to;			/* RF channel range, inclusive */
 	bool json;
 	unsigned int psi_timeout_ms;	/* how long to wait for PAT+SDT+NIT */
+	bool save;			/* merge results into the channel list */
 };
 
 /* Centre frequency of ISDB-T (ABNT/Chile) UHF channel rf, in Hz */

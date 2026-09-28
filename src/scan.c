@@ -2,10 +2,12 @@
 /* Channel scan: tune each UHF channel, read TMCC, collect PSI, report. */
 #include "scan.h"
 
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "channels.h"
 #include "dib0700.h"
 #include "psi.h"
 #include "stk8096gp.h"
@@ -108,6 +110,8 @@ static int psi_cb(const u8 *pkt, void *opaque)
 {
 	struct psi_parser *p = opaque;
 
+	if (!pkt)
+		return interrupted;
 	psi_feed(p, pkt);
 	return psi_complete(p) || interrupted;
 }
@@ -256,11 +260,61 @@ static void print_json(const struct mux_result *r, bool first)
 	fflush(stdout);
 }
 
+static bool list_has_rf(const struct channel_list *l, int rf)
+{
+	for (int i = 0; i < l->n; i++)
+		if (l->ch[i].rf == rf)
+			return true;
+	return false;
+}
+
+/*
+ * Merges one mux into the channel list. Muxes that didn't lock keep their
+ * old entries, and so does a mux heard only through its one-seg layer
+ * (no PAT): without the PAT, one-seg numbering and PMTs are guesses.
+ */
+static bool save_mux(struct channel_list *l, const struct mux_result *r)
+{
+	const struct psi_mux *m = &r->psi;
+	struct channel ch[PSI_MAX_SERVICES];
+	int n = 0;
+
+	if (!(r->status & FE_HAS_LOCK) || !r->have_psi)
+		return false;
+	if (!m->have_pat && list_has_rf(l, r->rf))
+		return false;
+
+	for (int i = 0; i < m->nservices; i++) {
+		const struct psi_service *s = &m->services[i];
+		struct channel *c = &ch[n];
+
+		if (!service_listed(m, s))
+			continue;
+		memset(c, 0, sizeof(*c));
+		psi_virtual_channel(m, s, &c->major, &c->minor);
+		snprintf(c->name, sizeof(c->name), "%s", s->name[0] ? s->name : "(unnamed)");
+		snprintf(c->kind, sizeof(c->kind), "%s", service_kind(s));
+		c->rf = r->rf;
+		c->service_id = s->service_id;
+		c->pmt_pid = s->in_pat ? s->pmt_pid : 0;
+		n++;
+	}
+	if (!n)
+		return false;
+	channels_replace_rf(l, r->rf, ch, n);
+	return true;
+}
+
 int scan_run(struct dib0700 *d, const struct scan_opts *o)
 {
 	struct mux_result r;
-	int locked = 0;
+	struct channel_list list = { 0 };
+	const char *path = channels_path();
+	int locked = 0, updated = 0;
 	bool first = true;
+
+	if (o->save && channels_load(&list, path) < 0)
+		fprintf(stderr, "warning: cannot read %s, starting a new list\n", path);
 
 	if (o->json)
 		printf("[");
@@ -274,6 +328,8 @@ int scan_run(struct dib0700 *d, const struct scan_opts *o)
 			fprintf(stderr, "\r                  \r");
 		if (r.status & FE_HAS_LOCK)
 			locked++;
+		if (o->save && save_mux(&list, &r))
+			updated++;
 		if (o->json) {
 			print_json(&r, first);
 			first = false;
@@ -285,6 +341,15 @@ int scan_run(struct dib0700 *d, const struct scan_opts *o)
 		printf("\n]\n");
 	else
 		printf("\n%d mux%s locked\n", locked, locked == 1 ? "" : "es");
+
+	if (o->save && updated) {
+		if (channels_save(&list, path) == 0)
+			fprintf(stderr, "saved %d channel%s (%d mux%s updated) to %s\n", list.n,
+				list.n == 1 ? "" : "s", updated, updated == 1 ? "" : "es", path);
+		else
+			fprintf(stderr, "cannot write %s: %s\n", path, strerror(errno));
+	}
+	channels_free(&list);
 	return interrupted ? 130 : 0;
 }
 
@@ -297,6 +362,8 @@ static int dump_cb(const u8 *pkt, void *opaque)
 {
 	struct dump_ctx *dc = opaque;
 
+	if (!pkt)
+		return interrupted;
 	fwrite(pkt, 1, TS_PACKET_SIZE, dc->f);
 	psi_feed(dc->p, pkt);
 	return interrupted;
@@ -332,7 +399,7 @@ int tune_run(struct dib0700 *d, int rf, const char *dump_path, unsigned int seco
 		fprintf(stderr, "TS read failed (%d)\n", n);
 		return 1;
 	}
-	fprintf(stderr, "wrote %d packets (%.1f MB, %.2f Mbit/s) to %s\n", n, n * 188 / 1e6,
-		n * 188 * 8 / 1e6 / seconds, dump_path);
+	fprintf(stderr, "wrote %d packets (%.1f MB, %.2f Mbit/s) to %s\n", n, n * 188.0 / 1e6,
+		n * 188.0 * 8 / 1e6 / seconds, dump_path);
 	return 0;
 }
