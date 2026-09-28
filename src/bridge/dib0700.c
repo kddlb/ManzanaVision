@@ -9,6 +9,8 @@
 
 #include <libusb.h>
 
+#include "manzana.h"
+
 #define DIB0700_VID 0x10b8
 #define STK8096GP_PID 0x1fa0
 
@@ -51,8 +53,8 @@ static int ctrl_wr(struct dib0700 *d, u8 *tx, u16 txlen)
 {
 	int ret = libusb_control_transfer(d->h, VENDOR_OUT, tx[0], 0, 0, tx, txlen, CTRL_TIMEOUT_MS);
 
-	if (ret != txlen && kcompat_debug)
-		fprintf(stderr, "dib0700: ep0 write of req 0x%02x failed: %s\n", tx[0],
+	if (ret != txlen)
+		kcompat_log(KC_LOG_DEBUG, "dib0700: ep0 write of req 0x%02x failed: %s\n", tx[0],
 			ret < 0 ? libusb_error_name(ret) : "short");
 	return ret < 0 ? -EIO : 0;
 }
@@ -74,8 +76,7 @@ static int download_firmware(struct dib0700 *d, const char *path)
 	int ret = 0, actlen;
 
 	if (!f) {
-		fprintf(stderr, "cannot open firmware '%s': %s\n"
-			"run scripts/fetch-firmware.sh or set MANZANA_FIRMWARE\n", path, strerror(errno));
+		kcompat_log(KC_LOG_ERROR, "cannot open firmware '%s': %s\n", path, strerror(errno));
 		return -ENOENT;
 	}
 	fseek(f, 0, SEEK_END);
@@ -107,7 +108,7 @@ static int download_firmware(struct dib0700 *d, const char *path)
 
 		ret = libusb_bulk_transfer(d->h, EP_FW_OUT, buf, len + 5, &actlen, 1000);
 		if (ret < 0) {
-			fprintf(stderr, "firmware download failed at %ld: %s\n", pos, libusb_error_name(ret));
+			kcompat_log(KC_LOG_ERROR, "firmware download failed at %ld: %s\n", pos, libusb_error_name(ret));
 			ret = -EIO;
 			break;
 		}
@@ -119,42 +120,48 @@ static int download_firmware(struct dib0700 *d, const char *path)
 
 	ret = libusb_bulk_transfer(d->h, EP_FW_OUT, jump, sizeof(jump), &actlen, 1000);
 	if (ret < 0 || actlen != sizeof(jump)) {
-		fprintf(stderr, "firmware jumpram failed: %s\n", libusb_error_name(ret));
+		kcompat_log(KC_LOG_ERROR, "firmware jumpram failed: %s\n", libusb_error_name(ret));
 		return -EIO;
 	}
 	msleep(500);
 	return 0;
 }
 
-struct dib0700 *dib0700_open(const char *firmware_path)
+int dib0700_open(const char *firmware_path, struct dib0700 **out)
 {
 	struct dib0700 *d = calloc(1, sizeof(*d));
 	u8 ver[16];
-	int ret;
+	int ret, err;
 
+	*out = NULL;
 	if (libusb_init(&d->ctx) < 0) {
-		fprintf(stderr, "libusb_init failed\n");
+		kcompat_log(KC_LOG_ERROR, "libusb_init failed\n");
 		free(d);
-		return NULL;
+		return MZV_ERR_IO;
 	}
 	d->h = libusb_open_device_with_vid_pid(d->ctx, DIB0700_VID, STK8096GP_PID);
 	if (!d->h) {
-		fprintf(stderr, "no STK8096GP (%04x:%04x) found\n", DIB0700_VID, STK8096GP_PID);
+		kcompat_log(KC_LOG_ERROR, "no STK8096GP (%04x:%04x) found\n", DIB0700_VID, STK8096GP_PID);
+		err = MZV_ERR_NO_DEVICE;
 		goto fail;
 	}
 	ret = libusb_claim_interface(d->h, 0);
 	if (ret < 0) {
-		fprintf(stderr, "cannot claim interface: %s\n", libusb_error_name(ret));
+		kcompat_log(KC_LOG_ERROR, "cannot claim interface: %s\n", libusb_error_name(ret));
+		err = (ret == LIBUSB_ERROR_BUSY || ret == LIBUSB_ERROR_ACCESS) ? MZV_ERR_BUSY : MZV_ERR_IO;
 		goto fail;
 	}
 
 	/* a cold bridge stalls GET_VERSION until firmware runs from RAM */
 	if (get_version(d, ver) <= 0) {
 		d->was_cold = true;
-		if (download_firmware(d, firmware_path) < 0)
+		if (download_firmware(d, firmware_path) < 0) {
+			err = MZV_ERR_FIRMWARE;
 			goto fail;
+		}
 		if (get_version(d, ver) <= 0) {
-			fprintf(stderr, "bridge did not come up after firmware download\n");
+			kcompat_log(KC_LOG_ERROR, "bridge did not come up after firmware download\n");
+			err = MZV_ERR_FIRMWARE;
 			goto fail;
 		}
 	}
@@ -163,11 +170,12 @@ struct dib0700 *dib0700_open(const char *firmware_path)
 	d->i2c.algo = &dib0700_i2c_algo;
 	strscpy(d->i2c.name, "dib0700 frontend i2c", sizeof(d->i2c.name));
 	i2c_set_adapdata(&d->i2c, d);
-	return d;
+	*out = d;
+	return MZV_OK;
 
 fail:
 	dib0700_close(d);
-	return NULL;
+	return err;
 }
 
 void dib0700_close(struct dib0700 *d)
@@ -220,12 +228,15 @@ int dib0700_ctrl_clock(struct dib0700 *d, u32 clk_MHz, u8 clock_out_gp3)
 
 static void trace_msg(const char *dir, const struct i2c_msg *m)
 {
+	char line[16 + 3 * 64];
+	int n;
+
 	if (kcompat_debug < 2)
 		return;
-	fprintf(stderr, "i2c %s %02x:", dir, m->addr);
-	for (int k = 0; k < m->len; k++)
-		fprintf(stderr, " %02x", m->buf[k]);
-	fprintf(stderr, "\n");
+	n = snprintf(line, sizeof(line), "i2c %s %02x:", dir, m->addr);
+	for (int k = 0; k < m->len && n < (int)sizeof(line) - 4; k++)
+		n += snprintf(line + n, sizeof(line) - n, " %02x", m->buf[k]);
+	kcompat_log(KC_LOG_TRACE, "%s\n", line);
 }
 
 /*
@@ -260,8 +271,7 @@ static int dib0700_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int n
 						      buf, msg[i + 1].len, CTRL_TIMEOUT_MS);
 			/* firmware quirk: a zero-length reply means the read failed */
 			if (ret <= 0) {
-				if (kcompat_debug)
-					fprintf(stderr, "dib0700: i2c read 0x%02x failed: %s\n", msg[i].addr,
+				kcompat_log(KC_LOG_DEBUG, "dib0700: i2c read 0x%02x failed: %s\n", msg[i].addr,
 						ret < 0 ? libusb_error_name(ret) : "empty");
 				return -EIO;
 			}
@@ -278,8 +288,7 @@ static int dib0700_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int n
 			ret = libusb_control_transfer(d->h, VENDOR_OUT, REQUEST_I2C_WRITE, 0, 0,
 						      buf, msg[i].len + 2, CTRL_TIMEOUT_MS);
 			if (ret < 0) {
-				if (kcompat_debug)
-					fprintf(stderr, "dib0700: i2c write 0x%02x failed: %s\n",
+				kcompat_log(KC_LOG_DEBUG, "dib0700: i2c write 0x%02x failed: %s\n",
 						msg[i].addr, libusb_error_name(ret));
 				return -EIO;
 			}
@@ -382,7 +391,7 @@ static void LIBUSB_CALL ts_xfer_done(struct libusb_transfer *xfer)
 	if (xfer->status == LIBUSB_TRANSFER_COMPLETED || xfer->status == LIBUSB_TRANSFER_TIMED_OUT) {
 		ts_feed(rc, xfer->buffer, xfer->actual_length);
 	} else if (xfer->status != LIBUSB_TRANSFER_CANCELLED) {
-		rc->error = LIBUSB_ERROR_IO;
+		rc->error = xfer->status == LIBUSB_TRANSFER_NO_DEVICE ? LIBUSB_ERROR_NO_DEVICE : LIBUSB_ERROR_IO;
 		rc->stop = 1;
 	}
 

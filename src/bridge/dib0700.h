@@ -29,9 +29,9 @@ struct dib0700;
 
 /*
  * Opens the first 10b8:1fa0 device, uploading firmware_path if the bridge is
- * still cold. Returns NULL (with a message on stderr) on failure.
+ * still cold. Returns MZV_OK or an MZV_ERR_* code (logged).
  */
-struct dib0700 *dib0700_open(const char *firmware_path);
+int dib0700_open(const char *firmware_path, struct dib0700 **out);
 void dib0700_close(struct dib0700 *d);
 
 u32 dib0700_fw_version(const struct dib0700 *d);

@@ -4,13 +4,13 @@
 
 #include <stdbool.h>
 
-struct dib0700;
+#include "manzana.h"
 
 /*
  * Stays tuned to one channel and redraws SNR, level, error rate and
  * per-layer lock until interrupted. With beep, plays a finder tone whose
  * pitch follows SNR: steady at full lock, pulsed at partial lock.
  */
-int meter_run(struct dib0700 *d, int rf, bool beep);
+int meter_run(mzv_device *dev, int rf, bool beep);
 
 #endif

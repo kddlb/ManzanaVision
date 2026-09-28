@@ -42,10 +42,9 @@ RF 27  551.143 MHz  LOCK  strength  61%  SNR 20.5 dB
 
 ```sh
 make
-scripts/fetch-firmware.sh   # linux-firmware から dvb-usb-dib0700-1.20.fw をダウンロード
 ```
 
-ファームウェアはリポジトリに含まれていません。スクリプトが linux-firmware からダウンロードし、SHA-1 を検証します。手元にあるファイルを使う場合は、環境変数 `MANZANA_FIRMWARE` でそのパスを指定してください。
+DiB0700 ブリッジのファームウェア（`firmware/dvb-usb-dib0700-1.20.fw`、linux-firmware 由来）を同梱しています。DiBcom は [`firmware/LICENSE.dib0700`](firmware/LICENSE.dib0700) の条件での再配布を認めています。別のファイルを使う場合は `MANZANA_FIRMWARE` で指定してください。
 
 ## 使い方
 

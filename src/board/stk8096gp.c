@@ -459,7 +459,7 @@ int stk_open(struct dib0700 *bridge)
 
 	ret = stk809x_frontend_attach(&board.adap);
 	if (ret < 0) {
-		fprintf(stderr, "DiB8000 demod not found\n");
+		kcompat_log(KC_LOG_ERROR, "DiB8000 demod not found\n");
 		return ret;
 	}
 	board.fe = board.adap.fe_adap[0].fe;
@@ -468,7 +468,7 @@ int stk_open(struct dib0700 *bridge)
 
 	ret = dib809x_tuner_attach(&board.adap);
 	if (ret < 0) {
-		fprintf(stderr, "DiB0090 tuner not found\n");
+		kcompat_log(KC_LOG_ERROR, "DiB0090 tuner not found\n");
 		return ret;
 	}
 

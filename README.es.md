@@ -39,10 +39,9 @@ La numeración de canales sigue el plan ABNT/SBTVD que se usa en Chile, Brasil y
 
 ```sh
 make
-scripts/fetch-firmware.sh   # descarga dvb-usb-dib0700-1.20.fw desde linux-firmware
 ```
 
-El firmware no viene en el repositorio. El script lo descarga desde linux-firmware y verifica su SHA-1. También puedes apuntar `MANZANA_FIRMWARE` a una copia que ya tengas.
+El firmware del puente DiB0700 (`firmware/dvb-usb-dib0700-1.20.fw`, de linux-firmware) viene incluido. DiBcom permite redistribuirlo según los términos de [`firmware/LICENSE.dib0700`](firmware/LICENSE.dib0700). Con `MANZANA_FIRMWARE` puedes usar otra copia.
 
 ## Uso
 

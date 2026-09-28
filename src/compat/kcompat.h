@@ -6,6 +6,13 @@
 #ifndef _KCOMPAT_H_
 #define _KCOMPAT_H_
 
+/*
+ * Kernel code shifts negative constants on purpose (register field packing)
+ * and narrows do_div() results; don't warn about idioms we vendor unchanged.
+ */
+#pragma clang diagnostic ignored "-Wshift-negative-value"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -70,8 +77,12 @@ typedef s64 __s64;
 	__rem;                                    \
 })
 
-/* logging */
+/* logging: everything goes through the core's log hook (see mzv_set_log) */
 extern int kcompat_debug;
+enum { KC_LOG_ERROR, KC_LOG_WARN, KC_LOG_INFO, KC_LOG_DEBUG, KC_LOG_TRACE }; /* = enum mzv_log_level */
+void kcompat_log(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+/* Sets kcompat_debug and every registered driver "debug" module param */
+void kcompat_set_debug(int level);
 #define KERN_SOH ""
 #define KERN_ERR ""
 #define KERN_WARNING ""
@@ -79,17 +90,17 @@ extern int kcompat_debug;
 #define KERN_INFO ""
 #define KERN_DEBUG ""
 #define KERN_CONT ""
-#define printk(fmt, ...) \
-	do { if (kcompat_debug) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
-#define pr_err(fmt, ...) fprintf(stderr, pr_fmt(fmt), ##__VA_ARGS__)
-#define pr_warn(fmt, ...) fprintf(stderr, pr_fmt(fmt), ##__VA_ARGS__)
-#define pr_info(fmt, ...) printk(pr_fmt(fmt), ##__VA_ARGS__)
-#define pr_debug(fmt, ...) printk(pr_fmt(fmt), ##__VA_ARGS__)
+#define printk(fmt, ...) kcompat_log(KC_LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define pr_err(fmt, ...) kcompat_log(KC_LOG_ERROR, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_warn(fmt, ...) kcompat_log(KC_LOG_WARN, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_info(fmt, ...) kcompat_log(KC_LOG_DEBUG, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_debug(fmt, ...) kcompat_log(KC_LOG_DEBUG, pr_fmt(fmt), ##__VA_ARGS__)
 #ifndef pr_fmt
 #define pr_fmt(fmt) fmt
 #endif
+/* The Makefile passes each module's name; other builds (SwiftPM) get the file name */
 #ifndef KBUILD_MODNAME
-#define KBUILD_MODNAME "kcompat"
+#define KBUILD_MODNAME __FILE_NAME__
 #endif
 
 /* module boilerplate */

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-only
 CC      ?= cc
 CFLAGS  ?= -O2 -g
-CFLAGS  += -std=gnu11 -Wall -Wno-shift-negative-value \
-           -Isrc/compat -Isrc/frontends -Isrc/bridge -Isrc/board -Isrc/ts -Isrc \
+CFLAGS  += -std=gnu11 -Wall \
+           -Isrc/include -Isrc/compat -Isrc/frontends -Isrc/bridge -Isrc/board -Isrc/ts -Isrc/core -Isrc \
            $(shell pkg-config --cflags libusb-1.0)
 LDLIBS  += $(shell pkg-config --libs libusb-1.0) -framework AudioToolbox
 
-SRCS := src/main.c src/scan.c src/meter.c src/tone.c src/channels.c src/watch.c \
+SRCS := $(wildcard src/cli/*.c) $(wildcard src/core/*.c) \
         src/ts/psi.c \
         src/bridge/dib0700.c \
         src/board/stk8096gp.c \

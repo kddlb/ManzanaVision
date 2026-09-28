@@ -5,16 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "dib0700.h"
+#include "cli.h"
 #include "meter.h"
-#include "scan.h"
-#include "stk8096gp.h"
-#include "watch.h"
 
-void kcompat_set_debug(int level);
-
-#define DEFAULT_FIRMWARE "firmware/dvb-usb-dib0700-1.20.fw"
+#define FIRMWARE_NAME "dvb-usb-dib0700-1.20.fw"
+#define DEFAULT_FIRMWARE "firmware/" FIRMWARE_NAME
 
 static void usage(void)
 {
@@ -35,15 +32,35 @@ static void usage(void)
 		"  signal <rf> [--beep]           live signal meter for aiming an antenna;\n"
 		"                                 --beep plays a tone whose pitch follows SNR\n"
 		"\n"
-		"The bridge firmware is read from $MANZANA_FIRMWARE or " DEFAULT_FIRMWARE ".\n"
+		"The bridge firmware is read from $MANZANA_FIRMWARE, " DEFAULT_FIRMWARE ",\n"
+		"or ~/Library/Application Support/ManzanaVision/firmware/.\n"
 		"The channel list lives in $MANZANA_CHANNELS or\n"
 		"~/Library/Application Support/ManzanaVision/channels.tsv.\n");
 }
 
+static mzv_device *device;
+
 static void on_sigint(int sig)
 {
 	(void)sig;
-	scan_interrupt();
+	if (device)
+		mzv_cancel(device);
+}
+
+/* $MANZANA_FIRMWARE, ./firmware/, then the folder the Mac app downloads into */
+static const char *find_firmware(void)
+{
+	static char path[1024];
+	const char *env = getenv("MANZANA_FIRMWARE");
+	const char *home = getenv("HOME");
+
+	if (env && *env)
+		return env;
+	if (access(DEFAULT_FIRMWARE, R_OK) == 0 || !home)
+		return DEFAULT_FIRMWARE;
+	snprintf(path, sizeof(path), "%s/Library/Application Support/ManzanaVision/firmware/%s", home,
+		 FIRMWARE_NAME);
+	return access(path, R_OK) == 0 ? path : DEFAULT_FIRMWARE;
 }
 
 int main(int argc, char **argv)
@@ -67,7 +84,7 @@ int main(int argc, char **argv)
 	unsigned int seconds = 10;
 	int verbose = 0, c, ret, rf = 0;
 	bool beep = false;
-	struct dib0700 *d;
+	struct mzv_device_info info;
 
 	/* "+" stops at the command; options after it are parsed below */
 	while ((c = getopt_long(argc, argv, "+vh", longopts, NULL)) != -1) {
@@ -87,7 +104,7 @@ int main(int argc, char **argv)
 			return 2;
 		}
 		rf = atoi(argv[optind++]);
-	} else if (!strcmp(cmd, "watch")) {
+	} else if (!strcmp(cmd, "watch") || !strcmp(cmd, "remux")) {
 		if (optind >= argc) {
 			usage();
 			return 2;
@@ -110,45 +127,54 @@ int main(int argc, char **argv)
 		}
 	}
 	if (strcmp(cmd, "probe") && strcmp(cmd, "scan") && strcmp(cmd, "tune") && strcmp(cmd, "signal") &&
-	    strcmp(cmd, "watch") && strcmp(cmd, "channels")) {
+	    strcmp(cmd, "watch") && strcmp(cmd, "channels") && strcmp(cmd, "remux")) {
 		usage();
 		return 2;
 	}
 	if (!strcmp(cmd, "channels"))
 		return channels_run(); /* no hardware needed */
-	if ((rf && (rf < 14 || rf > 69)) || so.from < 14 || so.to > 69 || so.from > so.to) {
+	if (!strcmp(cmd, "remux")) {
+		/* hidden: remux IN.ts <service_id|9.1> --output OUT.ts */
+		if (!query || !output || optind >= argc) {
+			fprintf(stderr, "usage: manzanavision remux IN.ts <service_id|virtual> --output OUT.ts\n");
+			return 2;
+		}
+		return remux_run(query, argv[optind], output);
+	}
+	if ((rf && (rf < MZV_RF_MIN || rf > MZV_RF_MAX)) || so.from < MZV_RF_MIN || so.to > MZV_RF_MAX ||
+	    so.from > so.to) {
 		fprintf(stderr, "UHF channels are 14-69\n");
 		return 2;
 	}
-	kcompat_set_debug(verbose);
+	mzv_set_debug(verbose);
 
-	fw = getenv("MANZANA_FIRMWARE");
-	d = dib0700_open(fw ? fw : DEFAULT_FIRMWARE);
-	if (!d)
-		return 1;
-	u32 v = dib0700_fw_version(d);
-	fprintf(stderr, "DiB0700 firmware 0x%05x%s\n", v,
-		dib0700_was_cold(d) ? " (uploaded)" : "");
-
-	if (stk_open(d) < 0) {
-		dib0700_close(d);
+	fw = find_firmware();
+	ret = mzv_open(fw, &device);
+	if (ret < 0) {
+		if (ret == MZV_ERR_BUSY)
+			fprintf(stderr, "the tuner is in use by another program\n");
+		else if (ret == MZV_ERR_FIRMWARE)
+			fprintf(stderr, "the firmware ships in firmware/; run from the repo or set MANZANA_FIRMWARE\n");
 		return 1;
 	}
-	fprintf(stderr, "DiB8000 rev 0x%04x + DiB0090 ready\n", stk_demod_revision());
+	mzv_get_info(device, &info);
+	fprintf(stderr, "DiB0700 firmware 0x%05x%s\n", info.firmware_version,
+		info.firmware_uploaded ? " (uploaded)" : "");
+	fprintf(stderr, "DiB8000 rev 0x%04x + DiB0090 ready\n", info.demod_revision);
 
 	signal(SIGINT, on_sigint);
 	if (!strcmp(cmd, "scan"))
-		ret = scan_run(d, &so);
+		ret = scan_run(device, &so);
 	else if (!strcmp(cmd, "tune"))
-		ret = tune_run(d, rf, dump, seconds);
+		ret = tune_run(device, rf, dump, seconds);
 	else if (!strcmp(cmd, "signal"))
-		ret = meter_run(d, rf, beep);
+		ret = meter_run(device, rf, beep);
 	else if (!strcmp(cmd, "watch"))
-		ret = watch_run(d, query, output);
+		ret = watch_run(device, query, output);
 	else
 		ret = 0;
 
-	stk_close();
-	dib0700_close(d);
+	mzv_close(device);
+	device = NULL;
 	return ret;
 }

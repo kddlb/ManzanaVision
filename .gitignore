@@ -1,6 +1,8 @@
 /build/
 /manzanavision
-/firmware/*.fw
 /compile_commands.json
 *.ts
 /.cache/
+/fixtures/
+/.build/
+/.swiftpm/
