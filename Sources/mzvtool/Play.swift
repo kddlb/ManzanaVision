@@ -6,29 +6,48 @@ import CoreImage
 import ManzanaPlayback
 import UniformTypeIdentifiers
 
+/// Something that feeds the engine: a recording or the live tuner
+protocol PlaySource: AnyObject, Sendable {
+    var title: String { get }
+    func start(engine: PlaybackEngine)
+    func stop()
+    /// Extra status for the per-second line
+    var status: String { get }
+}
+
+final class RecordingSource: PlaySource, @unchecked Sendable {
+    let source: FileSource
+    let title: String
+    init(url: URL, serviceID: UInt16, faults: FaultPlan) {
+        source = FileSource(url: url, serviceID: serviceID)
+        source.faults = faults
+        title = "\(url.lastPathComponent) · service 0x\(String(serviceID, radix: 16))"
+    }
+    func start(engine: PlaybackEngine) {
+        source.start(packets: { data, epoch in engine.feed(data, epoch: epoch) },
+                     program: { streams in engine.setProgram(streams) })
+    }
+    func stop() { source.stop() }
+    var status: String { "" }
+}
+
 @MainActor
 final class Player: NSObject, NSApplicationDelegate {
-    let url: URL
-    let serviceID: UInt16
+    let playSource: PlaySource
     let seconds: Double?
     let snapshotDir: URL?
     let deinterlace: DeinterlaceMode
-    let faults: FaultPlan
     let mute: Bool
     let layer = AVSampleBufferDisplayLayer()
     var engine: PlaybackEngine!
-    var source: FileSource!
     var window: NSWindow!
     var started = Date()
     var snapshots = 0
 
-    init(url: URL, serviceID: UInt16, seconds: Double?, snapshotDir: URL?, deinterlace: DeinterlaceMode,
-         faults: FaultPlan, mute: Bool) {
+    init(source: PlaySource, seconds: Double?, snapshotDir: URL?, deinterlace: DeinterlaceMode, mute: Bool) {
+        playSource = source
         self.deinterlace = deinterlace
-        self.faults = faults
         self.mute = mute
-        self.url = url
-        self.serviceID = serviceID
         self.seconds = seconds
         self.snapshotDir = snapshotDir
     }
@@ -36,7 +55,7 @@ final class Player: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 540),
                           styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "\(url.lastPathComponent) · service 0x\(String(serviceID, radix: 16))"
+        window.title = playSource.title
         let view = NSView()
         view.wantsLayer = true
         view.layer = CALayer()
@@ -52,11 +71,7 @@ final class Player: NSObject, NSApplicationDelegate {
 
         engine = PlaybackEngine(videoRenderer: layer.sampleBufferRenderer, deinterlace: deinterlace)
         engine.audioRenderer.isMuted = mute
-        source = FileSource(url: url, serviceID: serviceID)
-        source.faults = faults
-        let engine = self.engine!
-        source.start(packets: { data, epoch in engine.feed(data, epoch: epoch) },
-                     program: { streams in engine.setProgram(streams) })
+        playSource.start(engine: engine)
 
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             MainActor.assumeIsolated { self.tick() }
@@ -75,6 +90,7 @@ final class Player: NSObject, NSApplicationDelegate {
                      s.continuityErrors, s.audioConcealed, s.audioReanchors, s.restarts, s.stalls, s.ptsJumps, s.rebuffers,
                      s.rendererFailures, s.decoderResets))
         print(String(format: "  output: %d backwards, %d late, min lead %.3fs", s.outputBackwards, s.outputLate, s.outputMinLead))
+        if !playSource.status.isEmpty { print("  " + playSource.status) }
         fflush(stdout)
         if let dir = snapshotDir, s.state == .playing, Int(t) % 3 == 0 { snapshot(to: dir) }
         let renderer = layer.sampleBufferRenderer
@@ -84,7 +100,7 @@ final class Player: NSObject, NSApplicationDelegate {
             }
         }
         if let seconds, t >= seconds {
-            source.stop()
+            playSource.stop()
             engine.stop()
             NSApp.terminate(nil)
         }
@@ -146,8 +162,8 @@ func play(_ args: [String]) {
     if let snapshots { try? FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true) }
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
-    let player = Player(url: URL(fileURLWithPath: path), serviceID: sid, seconds: seconds, snapshotDir: snapshots,
-                        deinterlace: deinterlace, faults: faults, mute: mute)
+    let source = RecordingSource(url: URL(fileURLWithPath: path), serviceID: sid, faults: faults)
+    let player = Player(source: source, seconds: seconds, snapshotDir: snapshots, deinterlace: deinterlace, mute: mute)
     app.delegate = player
     app.run()
 }

@@ -9,6 +9,8 @@ let package = Package(
         .library(name: "ManzanaCore", targets: ["ManzanaCore"]),
         .library(name: "ManzanaStream", targets: ["ManzanaStream"]),
         .library(name: "ManzanaPlayback", targets: ["ManzanaPlayback"]),
+        .library(name: "ManzanaTuner", targets: ["ManzanaTuner"]),
+        .library(name: "ManzanaTV", targets: ["ManzanaTV"]),
     ],
     targets: [
         // libusb 1.0.30, macOS backend only, built from source so the app
@@ -53,9 +55,19 @@ let package = Package(
             name: "ManzanaPlayback",
             dependencies: ["ManzanaStream", "ManzanaCore"]
         ),
+        // Swift face of the tuner: device actor, hot-plug, firmware, channel list
+        .target(
+            name: "ManzanaTuner",
+            dependencies: ["ManzanaCore"]
+        ),
+        // Live TV: tuner + playback + status for the GUI
+        .target(
+            name: "ManzanaTV",
+            dependencies: ["ManzanaTuner", "ManzanaPlayback"]
+        ),
         .executableTarget(
             name: "mzvtool",
-            dependencies: ["ManzanaCore", "ManzanaStream", "ManzanaPlayback"]
+            dependencies: ["ManzanaCore", "ManzanaStream", "ManzanaPlayback", "ManzanaTuner", "ManzanaTV"]
         ),
         .testTarget(
             name: "ManzanaCoreTests",
@@ -64,6 +76,10 @@ let package = Package(
         .testTarget(
             name: "ManzanaStreamTests",
             dependencies: ["ManzanaStream", "ManzanaCore"]
+        ),
+        .testTarget(
+            name: "ManzanaTVTests",
+            dependencies: ["ManzanaTV", "ManzanaTuner"]
         ),
         .testTarget(
             name: "ManzanaPlaybackTests",

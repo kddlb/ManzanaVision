@@ -124,6 +124,8 @@ int mzv_tune(mzv_device *dev, int rf, struct mzv_signal *signal)
 		return MZV_ERR_INVALID;
 	if (mzv_is_cancelled(dev))
 		return MZV_ERR_CANCELLED;
+	if (dib0700_is_gone(dev->bridge))
+		return MZV_ERR_GONE;
 
 	status = stk_tune(mzv_rf_frequency(rf));
 	dev->tuned_rf = rf;
@@ -136,7 +138,7 @@ int mzv_tune(mzv_device *dev, int rf, struct mzv_signal *signal)
 int mzv_read_signal(mzv_device *dev, struct mzv_signal *signal)
 {
 	signal_fill(dev, stk_read_status(), signal);
-	return MZV_OK;
+	return dib0700_is_gone(dev->bridge) ? MZV_ERR_GONE : MZV_OK;
 }
 
 static enum mzv_modulation modulation(enum fe_modulation m)

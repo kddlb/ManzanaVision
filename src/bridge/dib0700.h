@@ -35,6 +35,11 @@ int dib0700_open(const char *firmware_path, struct dib0700 **out);
 void dib0700_close(struct dib0700 *d);
 
 u32 dib0700_fw_version(const struct dib0700 *d);
+
+/* The stick was unplugged (a libusb call said so); the handle is dead */
+bool dib0700_is_gone(struct dib0700 *d);
+/* After an I/O error: checks the stick still answers, marking it gone if not */
+bool dib0700_probe_alive(struct dib0700 *d);
 /* true if this open uploaded the firmware (device was cold) */
 bool dib0700_was_cold(const struct dib0700 *d);
 

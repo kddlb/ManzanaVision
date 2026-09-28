@@ -276,7 +276,10 @@ public final class PlaybackEngine: @unchecked Sendable {
         guard Double(now - playingSince) / 1e9 >= driftSettle else { return }
         let (vb, ab) = buffers()
         let depth = audioPID != nil ? ab : vb
-        if depth > bufferBand.upperBound + 2 || depth < -0.25 {
+        // underrun while data still arrives → rebuffer; if data stopped, the
+        // stall check above takes over (so the UI can say "signal lost")
+        let feeding = Double(now - lastFeed) / 1e9 < 0.5
+        if depth > bufferBand.upperBound + 2 || (depth < -0.25 && feeding) {
             // hopelessly behind live, or run dry: rebuffer from a fresh start point
             stats.rebuffers += 1
             restart()

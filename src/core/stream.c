@@ -12,6 +12,7 @@
 #define LOCK_CHECK_MS 500
 #define DEFAULT_RELOCK_AFTER_MS 2000
 #define RETUNE_PAUSE_MS 200
+#define MAX_IO_RETRIES 5	/* consecutive TS read failures before giving up */
 
 struct stream_ctx {
 	mzv_device *dev;
@@ -133,9 +134,14 @@ static int retune(struct stream_ctx *s)
 
 	event(s, MZV_EVENT_RETUNING);
 	for (;;) {
+		int ret;
+
 		if (mzv_is_cancelled(s->dev))
 			return MZV_ERR_CANCELLED;
-		if (mzv_tune(s->dev, s->opts->rf, &sig) == MZV_OK && sig.has_lock)
+		ret = mzv_tune(s->dev, s->opts->rf, &sig);
+		if (ret == MZV_ERR_GONE || !dib0700_probe_alive(s->dev->bridge))
+			return MZV_ERR_GONE;
+		if (ret == MZV_OK && sig.has_lock)
 			return MZV_OK;
 		msleep(RETUNE_PAUSE_MS);
 	}
@@ -146,6 +152,7 @@ int mzv_stream(mzv_device *dev, const struct mzv_stream_options *opts, const str
 	struct stream_ctx *s;
 	struct mzv_signal sig;
 	int ret = MZV_OK;
+	int io_errors = 0;
 
 	if (!opts || !cb || opts->rf < MZV_RF_MIN || opts->rf > MZV_RF_MAX)
 		return MZV_ERR_INVALID;
@@ -176,22 +183,40 @@ int mzv_stream(mzv_device *dev, const struct mzv_stream_options *opts, const str
 		dib0700_streaming_ctrl(dev->bridge, 0);
 		flush(s);
 
-		if (n == LIBUSB_ERROR_NO_DEVICE) {
+		/* a transfer error usually means the stick was pulled: check */
+		if (n == LIBUSB_ERROR_NO_DEVICE || (n < 0 && !dib0700_probe_alive(dev->bridge))) {
 			ret = MZV_ERR_GONE;
 			break;
 		}
 		if (n < 0) {
-			ret = MZV_ERR_IO;
-			break;
+			/* the stick still answers: a hiccup, so keep streaming unless
+			 * it keeps happening */
+			if (++io_errors > MAX_IO_RETRIES) {
+				ret = MZV_ERR_IO;
+				break;
+			}
+			mzv_log(MZV_LOG_WARN, "TS read failed; resuming (%d)\n", io_errors);
+			if (!s->need_retune && !s->stop && !mzv_is_cancelled(dev))
+				continue;
+		} else {
+			io_errors = 0;
 		}
 		if (s->stop || mzv_is_cancelled(dev) || !s->need_retune)
 			break;
+		if (!dib0700_probe_alive(dev->bridge)) {
+			ret = MZV_ERR_GONE;
+			break;
+		}
 
 		/* the demod won't re-acquire on its own */
 		s->need_retune = false;
 		event(s, MZV_EVENT_LOCK_LOST);
-		if (retune(s) < 0)
+		ret = retune(s);
+		if (ret < 0) {
+			if (ret == MZV_ERR_CANCELLED)
+				ret = MZV_OK;
 			break;
+		}
 		s->epoch++;
 		s->unlocked_since_ms = 0;
 		s->last_lock_check_ms = jiffies;

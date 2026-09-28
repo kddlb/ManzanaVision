@@ -39,6 +39,7 @@ struct dib0700 {
 	libusb_device_handle *h;
 	u32 fw_version;
 	bool was_cold;
+	bool gone;		/* libusb said the device is gone; nothing works any more */
 	u8 channel_state;
 	struct i2c_adapter i2c;
 
@@ -52,6 +53,9 @@ static const struct i2c_algorithm dib0700_i2c_algo;
 static int ctrl_wr(struct dib0700 *d, u8 *tx, u16 txlen)
 {
 	int ret = libusb_control_transfer(d->h, VENDOR_OUT, tx[0], 0, 0, tx, txlen, CTRL_TIMEOUT_MS);
+
+	if (ret == LIBUSB_ERROR_NO_DEVICE)
+		d->gone = true;
 
 	if (ret != txlen)
 		kcompat_log(KC_LOG_DEBUG, "dib0700: ep0 write of req 0x%02x failed: %s\n", tx[0],
@@ -191,6 +195,35 @@ void dib0700_close(struct dib0700 *d)
 }
 
 u32 dib0700_fw_version(const struct dib0700 *d) { return d->fw_version; }
+
+bool dib0700_is_gone(struct dib0700 *d)
+{
+	return d->gone;
+}
+
+/* After an I/O error: does the stick still answer? Marks it gone if not. */
+bool dib0700_probe_alive(struct dib0700 *d)
+{
+	u8 ver[16];
+	int ret;
+
+	if (d->gone)
+		return false;
+	/* A warm stick answers; NO_DEVICE is definitive. Anything else gets a
+	 * few tries: a transient hiccup mustn't end a stream (a replugged stick
+	 * is a new, cold device this handle can't reach, so it keeps failing). */
+	for (int i = 0; i < 3; i++) {
+		ret = get_version(d, ver);
+		if (ret > 0)
+			return true;
+		kcompat_log(KC_LOG_WARN, "dib0700: stick not answering (%s), try %d\n", libusb_error_name(ret), i + 1);
+		if (ret == LIBUSB_ERROR_NO_DEVICE)
+			break;
+		msleep(100);
+	}
+	d->gone = true;
+	return false;
+}
 bool dib0700_was_cold(const struct dib0700 *d) { return d->was_cold; }
 struct i2c_adapter *dib0700_i2c_adapter(struct dib0700 *d) { return &d->i2c; }
 
@@ -267,8 +300,11 @@ static int dib0700_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int n
 				index |= msg[i].buf[0] << 8;
 			if (msg[i].len > 1)
 				index |= msg[i].buf[1];
-			ret = libusb_control_transfer(d->h, VENDOR_IN, REQUEST_I2C_READ, value, index,
+			ret = d->gone ? LIBUSB_ERROR_NO_DEVICE :
+			      libusb_control_transfer(d->h, VENDOR_IN, REQUEST_I2C_READ, value, index,
 						      buf, msg[i + 1].len, CTRL_TIMEOUT_MS);
+			if (ret == LIBUSB_ERROR_NO_DEVICE)
+				d->gone = true;
 			/* firmware quirk: a zero-length reply means the read failed */
 			if (ret <= 0) {
 				kcompat_log(KC_LOG_DEBUG, "dib0700: i2c read 0x%02x failed: %s\n", msg[i].addr,
@@ -285,8 +321,11 @@ static int dib0700_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int n
 			buf[0] = REQUEST_I2C_WRITE;
 			buf[1] = msg[i].addr << 1;
 			memcpy(&buf[2], msg[i].buf, msg[i].len);
-			ret = libusb_control_transfer(d->h, VENDOR_OUT, REQUEST_I2C_WRITE, 0, 0,
+			ret = d->gone ? LIBUSB_ERROR_NO_DEVICE :
+			      libusb_control_transfer(d->h, VENDOR_OUT, REQUEST_I2C_WRITE, 0, 0,
 						      buf, msg[i].len + 2, CTRL_TIMEOUT_MS);
+			if (ret == LIBUSB_ERROR_NO_DEVICE)
+				d->gone = true;
 			if (ret < 0) {
 				kcompat_log(KC_LOG_DEBUG, "dib0700: i2c write 0x%02x failed: %s\n",
 						msg[i].addr, libusb_error_name(ret));
@@ -391,7 +430,12 @@ static void LIBUSB_CALL ts_xfer_done(struct libusb_transfer *xfer)
 	if (xfer->status == LIBUSB_TRANSFER_COMPLETED || xfer->status == LIBUSB_TRANSFER_TIMED_OUT) {
 		ts_feed(rc, xfer->buffer, xfer->actual_length);
 	} else if (xfer->status != LIBUSB_TRANSFER_CANCELLED) {
+		if (!rc->stop)
+			kcompat_log(KC_LOG_WARN, "dib0700: TS transfer failed (status %d, %d bytes)\n",
+				    xfer->status, xfer->actual_length);
 		rc->error = xfer->status == LIBUSB_TRANSFER_NO_DEVICE ? LIBUSB_ERROR_NO_DEVICE : LIBUSB_ERROR_IO;
+		if (xfer->status == LIBUSB_TRANSFER_NO_DEVICE)
+			rc->d->gone = true;
 		rc->stop = 1;
 	}
 
@@ -414,10 +458,18 @@ int dib0700_read_ts(struct dib0700 *d, unsigned int timeout_ms, dib0700_ts_cb cb
 		xfers[i] = libusb_alloc_transfer(0);
 		libusb_fill_bulk_transfer(xfers[i], d->h, EP_TS_IN, buf, TS_XFER_SIZE, ts_xfer_done, &rc, 0);
 		xfers[i]->flags |= LIBUSB_TRANSFER_FREE_BUFFER;
-		if (libusb_submit_transfer(xfers[i]) == 0)
+		int st = libusb_submit_transfer(xfers[i]);
+
+		if (st == 0)
 			rc.in_flight++;
+		else if (st == LIBUSB_ERROR_NO_DEVICE)
+			d->gone = true;
 	}
 
+	if (d->gone || rc.in_flight == 0) {
+		rc.stop = 1;
+		rc.error = d->gone ? LIBUSB_ERROR_NO_DEVICE : LIBUSB_ERROR_IO;
+	}
 	while (!rc.stop && (!timeout_ms || time_before(jiffies, deadline))) {
 		struct timeval tv = { .tv_sec = 0, .tv_usec = 50000 };
 
