@@ -23,9 +23,15 @@ final class VideoPipeline: @unchecked Sendable {
         var backwards = 0   // output PTS lower than the previous one
         var late = 0        // output PTS already behind the renderer's clock
         var minLead = Double.infinity
+        var rendererDecodeFailures = 0
+        var decoderResets = 0
     }
 
-    private let renderer: AVSampleBufferVideoRenderer
+    /// The synchronizer's receiver for the video renderer; only used on `queue`
+    private let receiver: AVSampleBufferVideoRenderer.Receiver
+    private let timebase: CMTimebase
+    /// Renderer events (failures), for the engine to watch
+    let events: any AsyncSequence<AVSampleBufferVideoRenderer.Receiver.RenderingEvent, Never> & Sendable
     private let queue = DispatchQueue(label: "mzv.video", qos: .userInteractive)
     private let deinterlacer: Deinterlacer?
     private var session: VTDecompressionSession?
@@ -36,6 +42,10 @@ final class VideoPipeline: @unchecked Sendable {
     private let lock = NSLock()
     private var generation = 0
     private var _mode: DeinterlaceMode
+    private var _needsRestart = false
+    private var firstSubmit: UInt64 = 0    // uptime ns, since the last flush/reset
+    private var lastSubmit: UInt64 = 0
+    private var lastOutput: UInt64 = 0
 
     // queue-confined
     private typealias Decoded = (image: CVPixelBuffer, pts: CMTime, duration: CMTime)
@@ -46,8 +56,10 @@ final class VideoPipeline: @unchecked Sendable {
     private var stats = Stats()
     private var lastOutputPTS: CMTime = .invalid
 
-    init(renderer: AVSampleBufferVideoRenderer, mode: DeinterlaceMode) {
-        self.renderer = renderer
+    init(receiver: sending AVSampleBufferVideoRenderer.Receiver, timebase: CMTimebase, mode: DeinterlaceMode) {
+        events = receiver.renderingEventsAfterFinishedEnqueuing
+        self.receiver = receiver
+        self.timebase = timebase
         _mode = mode
         deinterlacer = try? Deinterlacer()
     }
@@ -66,6 +78,31 @@ final class VideoPipeline: @unchecked Sendable {
 
     func currentStats() -> Stats { queue.sync { stats } }
 
+    /// Set when the renderer refused a frame in a way only a restart fixes
+    func takeNeedsRestart() -> Bool {
+        lock.withLock {
+            defer { _needsRestart = false }
+            return _needsRestart
+        }
+    }
+
+    /// Engine-queue watchdog: input keeps going but nothing decodes → new session
+    func checkDecoderStall(timeout: Double) -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        let t = UInt64(timeout * 1e9)
+        let (first, submit, output) = lock.withLock { (firstSubmit, lastSubmit, lastOutput) }
+        let since = max(output, first)
+        // fed within the timeout, yet nothing out for longer than it
+        guard session != nil, first > 0, now - submit < t, now - since >= t else { return false }
+        invalidateSession()
+        lock.withLock {
+            firstSubmit = 0
+            lastOutput = 0
+        }
+        queue.async { self.stats.decoderResets += 1 }
+        return true
+    }
+
     /// Decodes one compressed sample (called from the engine's queue)
     func decode(_ sample: CMSampleBuffer) {
         guard let format = CMSampleBufferGetFormatDescription(sample) else { return }
@@ -77,11 +114,18 @@ final class VideoPipeline: @unchecked Sendable {
             }
         }
         guard let session else { return }
-        let gen = lock.withLock { generation }
+        let gen = lock.withLock {
+            lastSubmit = DispatchTime.now().uptimeNanoseconds
+            if firstSubmit == 0 { firstSubmit = lastSubmit }
+            return generation
+        }
         let flags: VTDecodeFrameFlags = [._EnableAsynchronousDecompression, ._EnableTemporalProcessing]
         let st = VTDecompressionSessionDecodeFrame(session, sampleBuffer: sample, flags: flags, infoFlagsOut: nil) {
             [weak self] status, _, image, pts, duration in
             guard let self else { return }
+            if status == noErr, image != nil {
+                self.lock.withLock { self.lastOutput = DispatchTime.now().uptimeNanoseconds }
+            }
             // hop to our queue; drop frames from before the last flush
             queue.async {
                 guard gen == self.lock.withLock({ self.generation }) else { return }
@@ -96,9 +140,15 @@ final class VideoPipeline: @unchecked Sendable {
 
     /// Drops everything in flight (called on restarts)
     func flush() {
-        lock.withLock { generation += 1 }
+        lock.withLock {
+            generation += 1
+            firstSubmit = 0
+            lastSubmit = 0
+            lastOutput = 0
+        }
         if let session { VTDecompressionSessionWaitForAsynchronousFrames(session) }
         queue.sync {
+            receiver.flush()
             history.removeAll()
             reorder.removeAll()
             lastOutputPTS = .invalid
@@ -223,13 +273,25 @@ final class VideoPipeline: @unchecked Sendable {
         guard let sample else { return }
         if lastOutputPTS.isValid && pts <= lastOutputPTS { stats.backwards += 1 }
         lastOutputPTS = pts
-        let now = CMTimebaseGetTime(renderer.timebase)
-        if CMTimebaseGetRate(renderer.timebase) > 0 {
+        let now = CMTimebaseGetTime(timebase)
+        if CMTimebaseGetRate(timebase) > 0 {
             let lead = (pts - now).seconds
             if lead < 0 { stats.late += 1 }
             stats.minLead = min(stats.minLead, lead)
         }
-        renderer.enqueue(sample)
+        // handed over for good: nothing here touches the sample after this
+        nonisolated(unsafe) let owned = sample
+        switch receiver.enqueueImmediately(CMReadySampleBuffer(unsafeBuffer: owned)) {
+        case .enqueued, .cancelledDueToFlush:
+            break
+        case .enqueuedWithDecodeFailures(let errors):
+            stats.rendererDecodeFailures += errors.count
+        case .cancelledDueToFlushRequiredToResume, .cancelledDueToError:
+            lock.withLock { _needsRestart = true }
+            return
+        @unknown default:
+            break
+        }
         stats.output += 1
     }
 }

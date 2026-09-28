@@ -13,6 +13,8 @@ final class Player: NSObject, NSApplicationDelegate {
     let seconds: Double?
     let snapshotDir: URL?
     let deinterlace: DeinterlaceMode
+    let faults: FaultPlan
+    let mute: Bool
     let layer = AVSampleBufferDisplayLayer()
     var engine: PlaybackEngine!
     var source: FileSource!
@@ -20,8 +22,11 @@ final class Player: NSObject, NSApplicationDelegate {
     var started = Date()
     var snapshots = 0
 
-    init(url: URL, serviceID: UInt16, seconds: Double?, snapshotDir: URL?, deinterlace: DeinterlaceMode) {
+    init(url: URL, serviceID: UInt16, seconds: Double?, snapshotDir: URL?, deinterlace: DeinterlaceMode,
+         faults: FaultPlan, mute: Bool) {
         self.deinterlace = deinterlace
+        self.faults = faults
+        self.mute = mute
         self.url = url
         self.serviceID = serviceID
         self.seconds = seconds
@@ -46,7 +51,9 @@ final class Player: NSObject, NSApplicationDelegate {
         NSApp.activate()
 
         engine = PlaybackEngine(videoRenderer: layer.sampleBufferRenderer, deinterlace: deinterlace)
+        engine.audioRenderer.isMuted = mute
         source = FileSource(url: url, serviceID: serviceID)
+        source.faults = faults
         let engine = self.engine!
         source.start(packets: { data, epoch in engine.feed(data, epoch: epoch) },
                      program: { streams in engine.setProgram(streams) })
@@ -62,12 +69,11 @@ final class Player: NSObject, NSApplicationDelegate {
         let t = Date().timeIntervalSince(started)
         let s = engine.currentStats()
         let size = s.videoSize == .zero ? "-" : "\(Int(s.videoSize.width))x\(Int(s.videoSize.height))\(s.interlaced ? "i" : "p")"
-        print(String(format: "%5.1fs %@ epoch %u  decoded %d → out %d (%@ %.2f ms, errs %d)  video %d (%@, buf %.2fs)  audio %d (%@, buf %.2fs)  skipped %d  cc %d  errs %d  conceal %d  reanchor %d  restarts %d  vr %@",
-                     t, s.state.rawValue, s.epoch, s.decodedFrames, s.outputFrames, s.deinterlace.rawValue,
-                     s.deinterlaceGPUms, s.decodeErrors, s.videoFrames, size, s.videoBuffer, s.audioFrames,
-                     s.audioDescription, s.audioBuffer, s.videoSkippedBeforeSync, s.continuityErrors,
-                     s.videoErrors, s.audioConcealed, s.audioReanchors, s.restarts,
-                     layer.sampleBufferRenderer.status == .failed ? "FAILED \(layer.sampleBufferRenderer.error?.localizedDescription ?? "")" : "ok"))
+        print(String(format: "%5.1fs %@ epoch %u rate %.3f  decoded %d → out %d (%@ %.2f ms, errs %d)  %@  buf v %.2fs a %.2fs  %@  cc %d  conceal %d  reanchor %d  restarts %d stalls %d jumps %d rebuf %d rfail %d dreset %d",
+                     t, s.state.rawValue, s.epoch, s.rate, s.decodedFrames, s.outputFrames, s.deinterlace.rawValue,
+                     s.deinterlaceGPUms, s.decodeErrors, size, s.videoBuffer, s.audioBuffer, s.audioDescription,
+                     s.continuityErrors, s.audioConcealed, s.audioReanchors, s.restarts, s.stalls, s.ptsJumps, s.rebuffers,
+                     s.rendererFailures, s.decoderResets))
         print(String(format: "  output: %d backwards, %d late, min lead %.3fs", s.outputBackwards, s.outputLate, s.outputMinLead))
         fflush(stdout)
         if let dir = snapshotDir, s.state == .playing, Int(t) % 3 == 0 { snapshot(to: dir) }
@@ -111,6 +117,8 @@ func play(_ args: [String]) {
     var seconds: Double?
     var snapshots: URL?
     var deinterlace = DeinterlaceMode.auto
+    var faults = FaultPlan()
+    var mute = false
     var i = 0
     while i < args.count {
         switch args[i] {
@@ -118,12 +126,14 @@ func play(_ args: [String]) {
         case "--seconds": i += 1; seconds = Double(args[i])
         case "--snapshots": i += 1; snapshots = URL(fileURLWithPath: args[i], isDirectory: true)
         case "--deinterlace": i += 1; deinterlace = DeinterlaceMode(rawValue: args[i]) ?? .auto
+        case "--faults": i += 1; faults = FaultPlan(parsing: args[i]) ?? faults
+        case "--mute": mute = true
         default: path = args[i]
         }
         i += 1
     }
     guard let path, let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped) else {
-        FileHandle.standardError.write("usage: mzvtool play FILE.ts [--service 9.1|0x2600] [--seconds N] [--snapshots DIR] [--deinterlace auto|yadif|bob|decoder|off]\n".data(using: .utf8)!)
+        FileHandle.standardError.write("usage: mzvtool play FILE.ts [--service 9.1|0x2600] [--seconds N] [--snapshots DIR] [--deinterlace auto|yadif|bob|decoder|off]\n  [--mute] [--faults drop=P,tei=P,corrupt=P,gap=EVERY:LEN,jump=EVERY:LEN,clock=RATIO,seed=N]\n".data(using: .utf8)!)
         exit(2)
     }
     let svc = services(in: data)
@@ -137,7 +147,7 @@ func play(_ args: [String]) {
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     let player = Player(url: URL(fileURLWithPath: path), serviceID: sid, seconds: seconds, snapshotDir: snapshots,
-                        deinterlace: deinterlace)
+                        deinterlace: deinterlace, faults: faults, mute: mute)
     app.delegate = player
     app.run()
 }

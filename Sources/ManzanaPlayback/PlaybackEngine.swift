@@ -17,7 +17,12 @@ public struct ProgramStream: Sendable, Equatable {
 }
 
 public struct PlaybackStats: Sendable, Equatable {
-    public enum State: String, Sendable { case idle, buffering, playing }
+    public enum State: String, Sendable {
+        case idle
+        case buffering  // waiting for a start point
+        case playing
+        case stalled    // no data: showing the last picture
+    }
     public var state: State = .idle
     public var epoch: UInt32 = 0
     public var videoFrames = 0
@@ -28,6 +33,12 @@ public struct PlaybackStats: Sendable, Equatable {
     public var audioReanchors = 0
     public var continuityErrors = 0
     public var restarts = 0
+    public var stalls = 0
+    public var ptsJumps = 0
+    public var rendererFailures = 0
+    public var decoderResets = 0
+    public var rebuffers = 0
+    public var rate: Float = 0
     /// How far ahead of the playback clock the newest enqueued samples are
     public var videoBuffer: Double = 0
     public var audioBuffer: Double = 0
@@ -44,9 +55,10 @@ public struct PlaybackStats: Sendable, Equatable {
     public var outputMinLead: Double = 0
 }
 
-/// Demuxes one program's TS, decodes audio, and feeds the video/audio
-/// renderers under a shared synchronizer. All work runs on a private serial
-/// queue; the public methods are safe from any thread.
+/// Demuxes one program's TS, decodes it, and feeds the video/audio renderers
+/// under a shared synchronizer, recovering from gaps, jumps, stalls and
+/// renderer failures on its own. All work runs on a private serial queue;
+/// the public methods are safe from any thread.
 public final class PlaybackEngine: @unchecked Sendable {
     public let synchronizer = AVSampleBufferRenderSynchronizer()
     public let videoRenderer: AVSampleBufferVideoRenderer
@@ -59,8 +71,22 @@ public final class PlaybackEngine: @unchecked Sendable {
     public var latency = 0.5
     /// Video-only services start once this much is queued
     public var startupVideo = 0.5
+    /// Buffer depth the drift controller keeps playback within, in seconds
+    public var bufferBand: ClosedRange<Double> = 0.4...2.0
+    /// Drift control waits this long after a start, while the buffer settles
+    public var driftSettle = 5.0
+    /// No data for this long while playing → stalled
+    public var stallTimeout = 1.5
+    /// Timestamps moving more than this within an epoch → restart
+    public var jumpThreshold = 2.0
 
     private let queue = DispatchQueue(label: "mzv.playback", qos: .userInteractive)
+    /// The synchronizer's audio receiver; only used on `queue`
+    private let audioReceiver: AVSampleBufferAudioRenderer.Receiver
+    private let video: VideoPipeline
+    private var timer: DispatchSourceTimer?
+    private var eventTasks: [Task<Void, Never>] = []
+
     private var streams: [ProgramStream] = []
     private var videoPID: UInt16?
     private var audioPID: UInt16?
@@ -69,7 +95,6 @@ public final class PlaybackEngine: @unchecked Sendable {
     private var aac = AACStreamParser()
     private var factory = VideoSampleFactory()
     private let audioDecoder = AudioDecoder()
-    private let video: VideoPipeline
     private var epoch: UInt32?
     private var state = PlaybackStats.State.idle
     private var haveSync = false
@@ -77,13 +102,48 @@ public final class PlaybackEngine: @unchecked Sendable {
     private var pendingAudio: [CMSampleBuffer] = []
     private var lastVideoEnd: CMTime = .invalid
     private var lastAudioEnd: CMTime = .invalid
+    private var lastVideoPTS: CMTime = .invalid
+    private var lastFeed: UInt64 = 0          // uptime ns of the last packets
+    private var playingSince: UInt64 = 0
+    private var restartRequested = false
+    private var drift: Float = 1              // current rate nudge
     private var stats = PlaybackStats()
 
     public init(videoRenderer: AVSampleBufferVideoRenderer, deinterlace: DeinterlaceMode = .auto) {
         self.videoRenderer = videoRenderer
-        video = VideoPipeline(renderer: videoRenderer, mode: deinterlace)
-        synchronizer.addRenderer(videoRenderer)
-        synchronizer.addRenderer(audioRenderer)
+        audioRenderer.audioTimePitchAlgorithm = .spectral  // rate nudges keep the pitch
+        video = VideoPipeline(receiver: synchronizer.sampleBufferReceiver(adding: videoRenderer),
+                              timebase: synchronizer.timebase, mode: deinterlace)
+        audioReceiver = synchronizer.sampleBufferReceiver(adding: audioRenderer)
+
+        let videoEvents = video.events
+        let audioEvents = audioReceiver.renderingEventsAfterFinishedEnqueuing
+        eventTasks = [
+            Task { [weak self] in
+                for await event in videoEvents {
+                    guard case .didFailToDecode = event else {
+                        self?.queue.async { self?.rendererFailed() }
+                        continue
+                    }
+                }
+            },
+            Task { [weak self] in
+                for await event in audioEvents {
+                    if case .failed = event { self?.queue.async { self?.rendererFailed() } }
+                }
+            },
+        ]
+
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 0.25, repeating: 0.25)
+        t.setEventHandler { [weak self] in self?.housekeeping() }
+        t.resume()
+        timer = t
+    }
+
+    deinit {
+        timer?.cancel()
+        eventTasks.forEach { $0.cancel() }
     }
 
     /// The program's elementary streams (from its PMT). Plays the first
@@ -102,16 +162,22 @@ public final class PlaybackEngine: @unchecked Sendable {
     /// Packets of the program; a new epoch means a discontinuity (re-tune, zap, loop)
     public func feed(_ packets: Data, epoch: UInt32) {
         queue.async { [self] in
+            lastFeed = DispatchTime.now().uptimeNanoseconds
             if self.epoch != epoch {
                 self.epoch = epoch
                 stats.epoch = epoch
                 restart()
+            } else if state == .stalled {
+                restart()  // data is back after a gap: start clean
             }
-            checkRenderers()
             packets.withUnsafeBytes { raw in
                 demux.feed(raw) { handle($0) }
             }
             stats.continuityErrors = demux.stats.continuityErrors
+            if restartRequested {
+                restartRequested = false
+                restart()
+            }
             if state == .buffering { maybeStart() }
         }
     }
@@ -134,13 +200,11 @@ public final class PlaybackEngine: @unchecked Sendable {
             s.outputBackwards = v.backwards
             s.outputLate = v.late
             s.outputMinLead = v.minLead
+            s.decoderResets = v.decoderResets
             if v.interlacedSource { s.interlaced = true }
             s.state = state
-            let now = synchronizer.currentTime()
-            if state == .playing {
-                if lastVideoEnd.isValid { s.videoBuffer = (lastVideoEnd - now).seconds }
-                if lastAudioEnd.isValid { s.audioBuffer = (lastAudioEnd - now).seconds }
-            }
+            s.rate = state == .playing ? drift : 0
+            (s.videoBuffer, s.audioBuffer) = buffers()
             s.audioConcealed = audioDecoder.concealed
             s.audioReanchors = audioDecoder.reanchors
             return s
@@ -150,20 +214,26 @@ public final class PlaybackEngine: @unchecked Sendable {
     public func stop() {
         queue.sync {
             synchronizer.setRate(0, time: .zero)
-            videoRenderer.flush()
-            audioRenderer.flush()
+            video.flush()
+            audioReceiver.flush()
             state = .idle
         }
     }
 
     // MARK: - queue-confined
 
+    private func buffers() -> (video: Double, audio: Double) {
+        guard state == .playing else { return (0, 0) }
+        let now = synchronizer.currentTime()
+        return (lastVideoEnd.isValid ? (lastVideoEnd - now).seconds : 0,
+                lastAudioEnd.isValid ? (lastAudioEnd - now).seconds : 0)
+    }
+
     /// Drops everything in flight and waits for a fresh start point
     private func restart() {
         synchronizer.setRate(0, time: synchronizer.currentTime())
-        video.flush()
-        videoRenderer.flush(removingDisplayedImage: false, completionHandler: nil)
-        audioRenderer.flush()
+        video.flush()  // keeps the last picture on screen
+        audioReceiver.flush()
         demux.reset()
         h264.reset()
         aac.reset()
@@ -172,22 +242,63 @@ public final class PlaybackEngine: @unchecked Sendable {
         pendingAudio.removeAll()
         lastVideoEnd = .invalid
         lastAudioEnd = .invalid
+        lastVideoPTS = .invalid
         haveSync = false
-        if state == .playing { stats.restarts += 1 }
+        drift = 1
+        if state == .playing || state == .stalled { stats.restarts += 1 }
         state = .buffering
     }
 
-    private func checkRenderers() {
+    private func rendererFailed() {
+        stats.rendererFailures += 1
+        if state == .playing { restart() }
+    }
+
+    /// Every 250 ms: stall detection, decoder watchdog, drift control
+    private func housekeeping() {
         guard state == .playing else { return }
-        if videoRenderer.status == .failed || videoRenderer.requiresFlushToResumeDecoding
-            || audioRenderer.status == .failed {
-            stats.videoErrors += 1
+        let now = DispatchTime.now().uptimeNanoseconds
+
+        if Double(now - lastFeed) / 1e9 > stallTimeout {
+            // freeze on the last picture until data returns
+            synchronizer.setRate(0, time: synchronizer.currentTime())
+            state = .stalled
+            stats.stalls += 1
+            return
+        }
+        if video.takeNeedsRestart() {
+            rendererFailed()
+            return
+        }
+        _ = video.checkDecoderStall(timeout: 2)
+
+        // keep the buffer inside the band by nudging the rate (pitch preserved)
+        guard Double(now - playingSince) / 1e9 >= driftSettle else { return }
+        let (vb, ab) = buffers()
+        let depth = audioPID != nil ? ab : vb
+        if depth > bufferBand.upperBound + 2 || depth < -0.25 {
+            // hopelessly behind live, or run dry: rebuffer from a fresh start point
+            stats.rebuffers += 1
             restart()
+            return
+        }
+        // outside the band: speed up/slow down in proportion to the error, up
+        // to ±1%; back to 1.0 once the buffer is back at the middle
+        let mid = (bufferBand.lowerBound + bufferBand.upperBound) / 2
+        var target = drift
+        if depth > bufferBand.upperBound || depth < bufferBand.lowerBound {
+            target = 1 + Float(max(-0.01, min(0.01, 0.005 * (depth - mid))))
+        } else if (drift > 1 && depth <= mid) || (drift < 1 && depth >= mid) {
+            target = 1
+        }
+        if abs(target - drift) >= 0.0005 || (target == 1 && drift != 1) {
+            drift = target
+            synchronizer.rate = drift
         }
     }
 
     private func handle(_ event: DemuxEvent) {
-        guard case .pes(let pes) = event else { return }
+        guard case .pes(let pes) = event, !restartRequested else { return }
         if pes.pid == videoPID {
             for frame in h264.feed(pes) {
                 if !haveSync {
@@ -203,11 +314,13 @@ public final class PlaybackEngine: @unchecked Sendable {
                     stats.videoErrors += 1
                     continue
                 }
+                if jumped(CMSampleBufferGetPresentationTimeStamp(sb)) { return }
                 enqueue(video: sb)
             }
         } else if pes.pid == audioPID {
             for frame in aac.feed(pes) {
                 guard let sb = try? audioDecoder.decode(frame) else { continue }
+                if videoPID == nil, jumped(CMSampleBufferGetPresentationTimeStamp(sb)) { return }
                 if stats.audioDescription.isEmpty || stats.audioFrames % 500 == 0 {
                     let c = AudioDecoder.effectiveConfig(frame.config)
                     stats.audioDescription = "\(c.ps ? "HE-AACv2" : c.sbr ? "HE-AAC" : "AAC-LC") \(c.outputSampleRate) Hz \(c.channels) ch"
@@ -215,6 +328,17 @@ public final class PlaybackEngine: @unchecked Sendable {
                 enqueue(audio: sb)
             }
         }
+    }
+
+    /// A timestamp far from the last one (in either direction) within an
+    /// epoch means the source jumped; restart after this batch
+    private func jumped(_ pts: CMTime) -> Bool {
+        defer { if !restartRequested { lastVideoPTS = pts } }
+        guard pts.isValid, lastVideoPTS.isValid,
+              abs((pts - lastVideoPTS).seconds) > jumpThreshold else { return false }
+        stats.ptsJumps += 1
+        restartRequested = true
+        return true
     }
 
     private func enqueue(video sb: CMSampleBuffer) {
@@ -232,9 +356,20 @@ public final class PlaybackEngine: @unchecked Sendable {
         stats.audioFrames += 1
         lastAudioEnd = CMSampleBufferGetPresentationTimeStamp(sb) + CMSampleBufferGetDuration(sb)
         if state == .playing {
-            audioRenderer.enqueue(sb)
+            enqueueAudio(sb)
         } else {
             pendingAudio.append(sb)
+        }
+    }
+
+    private func enqueueAudio(_ sb: CMSampleBuffer) {
+        // handed over for good: nothing here touches the sample after this
+        nonisolated(unsafe) let owned = sb
+        switch audioReceiver.enqueueImmediately(CMReadySampleBuffer(unsafeBuffer: owned)) {
+        case .cancelledDueToError:
+            restartRequested = true
+        default:
+            break
         }
     }
 
@@ -257,12 +392,15 @@ public final class PlaybackEngine: @unchecked Sendable {
         synchronizer.setRate(0, time: start)
         for sb in pendingVideo { video.decode(sb) }
         for sb in pendingAudio where CMSampleBufferGetPresentationTimeStamp(sb) + CMSampleBufferGetDuration(sb) > start {
-            audioRenderer.enqueue(sb)
+            enqueueAudio(sb)
         }
         pendingVideo.removeAll()
         pendingAudio.removeAll()
         let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
         synchronizer.setRate(1, time: start, atHostTime: hostNow + CMTime(seconds: latency, preferredTimescale: 1_000_000))
+        drift = 1
+        lastFeed = DispatchTime.now().uptimeNanoseconds
+        playingSince = lastFeed
         state = .playing
     }
 }
