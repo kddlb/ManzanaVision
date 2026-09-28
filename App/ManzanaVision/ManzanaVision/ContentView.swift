@@ -67,7 +67,8 @@ struct ChannelList: View {
         .toolbar {
             ToolbarItem {
                 Button("Scan", systemImage: "arrow.clockwise") { showingScan = true }
-                    .help("Scan for channels")
+                    .help(model.recording == nil ? "Scan for channels" : "Stop recording to scan")
+                    .disabled(model.recording != nil)
             }
         }
         .navigationTitle("Channels")
@@ -75,6 +76,7 @@ struct ChannelList: View {
 }
 
 struct ChannelRow: View {
+    @Environment(AppModel.self) private var model
     let channel: Channel
 
     var body: some View {
@@ -86,6 +88,11 @@ struct ChannelRow: View {
             Text(channel.name)
                 .lineLimit(1)
             Spacer()
+            if model.recording?.recorder.channel == channel {
+                Image(systemName: "record.circle.fill")
+                    .foregroundStyle(.red)
+                    .help("Recording")
+            }
             if let badge {
                 Text(badge)
                     .font(.caption2.weight(.semibold))

@@ -23,6 +23,7 @@ El firmware del sintonizador y libusb vienen incluidos en la app.
 - **Información de señal** (⌘I) muestra SNR, nivel, el enganche y la modulación de cada capa, errores, los formatos de video y audio, los búferes y los contadores de recuperación.
 - **Los problemas se explican en pantalla:** sintonizador desconectado, en uso por otro programa, sin señal, recepción débil o mala. Tras un corte, la imagen se difumina mientras la app vuelve a sintonizar sola, y retoma la reproducción cuando se vuelve a conectar el sintonizador.
 - **Pantalla completa** muestra solo la imagen: haz doble clic sobre ella y presiona Esc para salir. **Imagen dentro de imagen** está en el menú Canal (⌃⌘P).
+- **Grabar** (⌘R, o Canal → Grabar durante) guarda el canal tal como se transmite, en MPEG-TS, en Películas/ManzanaVision; VLC, IINA y mpv lo reproducen. **Archivo → Exportar grabación para QuickTime** convierte una grabación en un MP4 (HEVC, desentrelazado a 60 fps, AAC) para QuickTime, Fotos o un iPhone.
 - La app está en inglés, español y portugués de Brasil.
 
 La numeración de canales sigue el plan ABNT/SBTVD que se usa en Brasil, Chile y el resto de Latinoamérica: el canal *n* está centrado en 473 + 6·(n−14) + 1/7 MHz.

@@ -37,8 +37,35 @@ struct SettingsView: View {
                 }
             }
             .tabItem { Label("Tuner", systemImage: "antenna.radiowaves.left.and.right") }
+
+            Form {
+                LabeledContent("Save recordings in") {
+                    Text(model.recordingsFolder.path).textSelection(.enabled)
+                }
+                HStack {
+                    Button("Choose…") { chooseRecordingsFolder() }
+                    Button("Show in Finder") { model.showRecordings() }
+                    if model.recordingsFolder != AppModel.defaultRecordingsFolder {
+                        Button("Use Default") { model.recordingsFolder = AppModel.defaultRecordingsFolder }
+                    }
+                }
+                Text("Recordings are saved as broadcast, in MPEG-TS, and play in VLC, IINA or mpv. For QuickTime, Photos or an iPhone, use File → Export Recording for QuickTime.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .tabItem { Label("Recordings", systemImage: "record.circle") }
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 280)
+    }
+
+    private func chooseRecordingsFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = model.recordingsFolder
+        panel.prompt = String(localized: "Choose")
+        if panel.runModal() == .OK, let url = panel.url { model.recordingsFolder = url }
     }
 }

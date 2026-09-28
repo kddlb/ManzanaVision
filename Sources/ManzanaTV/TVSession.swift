@@ -25,4 +25,7 @@ public protocol TVSession: AnyObject, Sendable {
     func stop()
     /// Stops playback and scans rfs, saving what it finds
     func scan(_ rfs: ClosedRange<Int>, psiTimeout: Duration) -> AsyncThrowingStream<ScanProgress, Error>
+    /// Also sends the playing channel's stream to a recorder (nil stops);
+    /// only packets of the recorder's own channel reach it
+    func setRecorder(_ recorder: TSRecorder?)
 }

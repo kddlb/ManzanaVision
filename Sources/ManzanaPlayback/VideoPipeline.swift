@@ -5,7 +5,8 @@ import Foundation
 import VideoToolbox
 
 /// Decodes compressed video with VideoToolbox, deinterlaces interlaced frames
-/// on the GPU at field rate, and enqueues the pictures to the renderer.
+/// on the GPU at field rate, and enqueues the pictures to the renderer (or,
+/// for exporting, hands them to a callback).
 ///
 /// Compressed samples arrive from the engine's queue; decoded frames come
 /// back on VideoToolbox's thread in decode order (it doesn't reorder these
@@ -28,8 +29,12 @@ final class VideoPipeline: @unchecked Sendable {
     }
 
     /// The synchronizer's receiver for the video renderer; only used on `queue`
-    private let receiver: AVSampleBufferVideoRenderer.Receiver
-    private let timebase: CMTimebase
+    private let receiver: AVSampleBufferVideoRenderer.Receiver?
+    private let timebase: CMTimebase?
+    /// Instead of a renderer: frames in display order (image, pts, duration), on `queue`
+    private let frameSink: ((CVPixelBuffer, CMTime, CMTime) -> Void)?
+    /// Called on `queue` once per compressed sample that came back from the decoder
+    private let decodedOne: (() -> Void)?
     /// Renderer events (failures), for the engine to watch
     let events: any AsyncSequence<AVSampleBufferVideoRenderer.Receiver.RenderingEvent, Never> & Sendable
     private let queue = DispatchQueue(label: "mzv.video", qos: .userInteractive)
@@ -60,6 +65,21 @@ final class VideoPipeline: @unchecked Sendable {
         events = receiver.renderingEventsAfterFinishedEnqueuing
         self.receiver = receiver
         self.timebase = timebase
+        frameSink = nil
+        decodedOne = nil
+        _mode = mode
+        deinterlacer = try? Deinterlacer()
+    }
+
+    /// Offline: frames go to `frames`; `decodedOne` lets the caller bound how
+    /// much is in flight
+    init(mode: DeinterlaceMode, frames: @escaping (CVPixelBuffer, CMTime, CMTime) -> Void,
+         decodedOne: @escaping () -> Void) {
+        events = AsyncStream { $0.finish() }
+        receiver = nil
+        timebase = nil
+        frameSink = frames
+        self.decodedOne = decodedOne
         _mode = mode
         deinterlacer = try? Deinterlacer()
     }
@@ -128,12 +148,16 @@ final class VideoPipeline: @unchecked Sendable {
             }
             // hop to our queue; drop frames from before the last flush
             queue.async {
+                defer { self.decodedOne?() }
                 guard gen == self.lock.withLock({ self.generation }) else { return }
                 self.decoded(status: status, image: image, pts: pts, duration: duration)
             }
         }
         if st != noErr {
-            queue.async { self.stats.decodeErrors += 1 }
+            queue.async {
+                self.stats.decodeErrors += 1
+                self.decodedOne?()  // may or may not also come back through the handler; over-release only loosens the bound
+            }
             if st == kVTInvalidSessionErr { invalidateSession() }
         }
     }
@@ -148,10 +172,32 @@ final class VideoPipeline: @unchecked Sendable {
         }
         if let session { VTDecompressionSessionWaitForAsynchronousFrames(session) }
         queue.sync {
-            receiver.flush()
+            receiver?.flush()
             history.removeAll()
             reorder.removeAll()
             lastOutputPTS = .invalid
+        }
+    }
+
+    /// End of input: waits for the decoder, then pushes out the frames held
+    /// back for reordering and deinterlacing
+    func finish() {
+        if let session {
+            VTDecompressionSessionFinishDelayedFrames(session)
+            VTDecompressionSessionWaitForAsynchronousFrames(session)
+        }
+        queue.sync {
+            while !reorder.isEmpty {
+                let f = reorder.removeFirst()
+                display(image: f.image, pts: f.pts, duration: f.duration)
+            }
+            // YADIF waits for a next frame; the last one uses itself
+            let mode = self.mode
+            if mode != .bob, mode.kernel != nil, let last = history.last, let deinterlacer {
+                let prev = history.count >= 2 ? history[history.count - 2].image : last.image
+                emitFields(prev: prev, cur: last, next: last.image, with: deinterlacer, mode: mode)
+            }
+            history.removeAll()
         }
     }
 
@@ -257,6 +303,14 @@ final class VideoPipeline: @unchecked Sendable {
     }
 
     private func enqueue(_ image: CVPixelBuffer, pts: CMTime, duration: CMTime) {
+        if let frameSink {
+            if lastOutputPTS.isValid && pts <= lastOutputPTS { stats.backwards += 1 }
+            lastOutputPTS = pts
+            frameSink(image, pts, duration)
+            stats.output += 1
+            return
+        }
+        guard let receiver, let timebase else { return }
         let key = "\(CVPixelBufferGetWidth(image))x\(CVPixelBufferGetHeight(image))"
         var format = outputFormats[key]
         if format == nil || !CMVideoFormatDescriptionMatchesImageBuffer(format!, imageBuffer: image) {

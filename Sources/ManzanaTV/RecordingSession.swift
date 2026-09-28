@@ -21,6 +21,7 @@ public final class RecordingSession: TVSession, @unchecked Sendable {
     private var ticker: Task<Void, Never>?
     private var session: UInt32 = 0
     private var lostUntil: ContinuousClock.Instant?
+    private var recorder: TSRecorder?
 
     /// All "rfNN*.ts" files in a directory (the first per RF wins)
     public init(engine: PlaybackEngine, directory: URL) {
@@ -77,7 +78,11 @@ public final class RecordingSession: TVSession, @unchecked Sendable {
         }
         let src = FileSource(url: url, serviceID: channel.serviceID)
         let engine = self.engine
-        src.start(packets: { [self] in if !signalLost { engine.feed($0, epoch: base + $1) } },
+        src.start(packets: { [self] data, epoch in
+                      guard !signalLost else { return }
+                      engine.feed(data, epoch: base + epoch)
+                      if let r = lock.withLock({ recorder }), r.channel == channel { r.write(data) }
+                  },
                   program: { engine.setProgram($0) })
         lock.withLock {
             source = src
@@ -114,6 +119,10 @@ public final class RecordingSession: TVSession, @unchecked Sendable {
     /// how the app rides out a dropout
     public func simulateSignalLoss(for duration: Duration) {
         lock.withLock { lostUntil = .now + duration }
+    }
+
+    public func setRecorder(_ recorder: TSRecorder?) {
+        lock.withLock { self.recorder = recorder }
     }
 
     private func stopSource() {

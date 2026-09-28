@@ -152,12 +152,14 @@ case "play":
     MainActor.assumeIsolated { play(Array(args.dropFirst(2))) }
 case "live":
     MainActor.assumeIsolated { live(Array(args.dropFirst(2))) }
+case "export":
+    export(Array(args.dropFirst(2)))
 case "probe" where args.count > 2:
     do { try probe(args[2]) } catch {
         FileHandle.standardError.write("\(error)\n".data(using: .utf8)!)
         exit(1)
     }
 default:
-    FileHandle.standardError.write("usage: mzvtool version | probe FILE.ts | play FILE.ts ... | live 9.1 ...\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: mzvtool version | probe FILE.ts | play FILE.ts ... | live 9.1 ... | export FILE.ts OUT.mp4 ...\n".data(using: .utf8)!)
     exit(2)
 }

@@ -57,6 +57,7 @@ public final class LiveSession: TVSession, @unchecked Sendable {
     private var task: Task<Void, Never>?
     private var watcher: Task<Void, Never>?
     private var session: UInt32 = 0
+    private var recorder: TSRecorder?
 
     public init(engine: PlaybackEngine, tuner: TunerService = TunerService(), monitor: DeviceMonitor = DeviceMonitor()) {
         self.engine = engine
@@ -65,6 +66,10 @@ public final class LiveSession: TVSession, @unchecked Sendable {
         (statusUpdates, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(16))
         (signalUpdates, signalContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (tmccUpdates, tmccContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+    }
+
+    public func setRecorder(_ recorder: TSRecorder?) {
+        lock.withLock { self.recorder = recorder }
     }
 
     deinit {
@@ -225,7 +230,10 @@ public final class LiveSession: TVSession, @unchecked Sendable {
         }
         let engine = self.engine
         let sink = StreamSink(
-            packets: { engine.feed($0, epoch: base + $1) },
+            packets: { [self] data, epoch in
+                engine.feed(data, epoch: base + epoch)
+                if let r = lock.withLock({ recorder }), r.channel == channel { r.write(data) }
+            },
             program: { es in engine.setProgram(es.map { ProgramStream(pid: $0.pid, streamType: $0.streamType) }) },
             signal: { [self] s in
                 let reception = lock.withLock {

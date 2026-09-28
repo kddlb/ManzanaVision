@@ -533,6 +533,22 @@
         }
       }
     },
+    "Cancel Export": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar exportación"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar exportação"
+          }
+        }
+      }
+    },
     "Cancelled.": {
       "localizations": {
         "es": {
@@ -593,6 +609,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canais"
+          }
+        }
+      }
+    },
+    "Choose": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher"
+          }
+        }
+      }
+    },
+    "Choose a recording to export for QuickTime.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una grabación para exportar para QuickTime."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma gravação para exportar para o QuickTime."
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher…"
           }
         }
       }
@@ -661,6 +725,22 @@
         }
       }
     },
+    "Dismiss": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fechar"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "es": {
@@ -689,6 +769,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "Erros"
+          }
+        }
+      }
+    },
+    "Export Recording for QuickTime…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar grabación para QuickTime…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar gravação para QuickTime…"
+          }
+        }
+      }
+    },
+    "Export failed: %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falló la exportación: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na exportação: %@"
+          }
+        }
+      }
+    },
+    "Exported %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ exportado"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ exportado"
+          }
+        }
+      }
+    },
+    "Exporting %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportando %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportando %@"
           }
         }
       }
@@ -917,6 +1061,22 @@
         }
       }
     },
+    "Keep Recording": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seguir grabando"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuar gravando"
+          }
+        }
+      }
+    },
     "Layers": {
       "localizations": {
         "es": {
@@ -1080,6 +1240,22 @@
         }
       }
     },
+    "OK": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
     "Off": {
       "localizations": {
         "es": {
@@ -1224,6 +1400,9 @@
         }
       }
     },
+    "REC": {
+      "shouldTranslate": false
+    },
     "RF %lld": {
       "shouldTranslate": false
     },
@@ -1239,6 +1418,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "RF %lld de %lld–%lld…"
+          }
+        }
+      }
+    },
+    "Record": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar"
+          }
+        }
+      }
+    },
+    "Record For": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabar durante"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar por"
+          }
+        }
+      }
+    },
+    "Record this channel": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabar este canal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar este canal"
+          }
+        }
+      }
+    },
+    "Recording": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabando"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravando"
+          }
+        }
+      }
+    },
+    "Recording Stopped": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabación detenida"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravação interrompida"
+          }
+        }
+      }
+    },
+    "Recordings": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabaciones"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravações"
+          }
+        }
+      }
+    },
+    "Recordings are saved as broadcast, in MPEG-TS, and play in VLC, IINA or mpv. For QuickTime, Photos or an iPhone, use File → Export Recording for QuickTime.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las grabaciones se guardan tal como se transmiten, en MPEG-TS, y se reproducen en VLC, IINA o mpv. Para QuickTime, Fotos o un iPhone, usa Archivo → Exportar grabación para QuickTime."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As gravações são salvas como transmitidas, em MPEG-TS, e tocam no VLC, IINA ou mpv. Para o QuickTime, o Fotos ou um iPhone, use Arquivo → Exportar gravação para QuickTime."
           }
         }
       }
@@ -1274,6 +1565,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "SNR %.1f dB"
+          }
+        }
+      }
+    },
+    "Save recordings in": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar grabaciones en"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvar gravações em"
           }
         }
       }
@@ -1422,6 +1729,22 @@
         }
       }
     },
+    "Show Recordings": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar grabaciones"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar gravações"
+          }
+        }
+      }
+    },
     "Show Signal Info": {
       "localizations": {
         "es": {
@@ -1434,6 +1757,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar informações do sinal"
+          }
+        }
+      }
+    },
+    "Show in Finder": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar en el Finder"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar no Finder"
           }
         }
       }
@@ -1519,6 +1858,22 @@
         }
       }
     },
+    "Start Recording": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empezar a grabar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começar a gravar"
+          }
+        }
+      }
+    },
     "Starting the tuner…": {
       "localizations": {
         "es": {
@@ -1547,6 +1902,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parar"
+          }
+        }
+      }
+    },
+    "Stop Recording": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener grabación"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar gravação"
+          }
+        }
+      }
+    },
+    "Stop Recording and Watch %@ %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener la grabación y ver %@ %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a gravação e assistir a %@ %@"
+          }
+        }
+      }
+    },
+    "Stop Recording?": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Detener la grabación?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a gravação?"
+          }
+        }
+      }
+    },
+    "Stop recording": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener la grabación"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a gravação"
+          }
+        }
+      }
+    },
+    "Stop recording to scan": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detén la grabación para buscar canales"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pare a gravação para buscar canais"
           }
         }
       }
@@ -1630,6 +2065,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "O sintonizador parou de responder. Desconecte-o e conecte-o novamente."
+          }
+        }
+      }
+    },
+    "There's only one tuner, so changing channel ends the recording.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hay un solo sintonizador, así que cambiar de canal termina la grabación."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Há só um sintonizador, então trocar de canal encerra a gravação."
           }
         }
       }
@@ -1746,6 +2197,22 @@
         }
       }
     },
+    "Use Default": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar la predeterminada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar a padrão"
+          }
+        }
+      }
+    },
     "Video": {
       "localizations": {
         "es": {
@@ -1809,6 +2276,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "não encontrado"
+          }
+        }
+      }
+    },
+    "until %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hasta las %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "até %@"
           }
         }
       }

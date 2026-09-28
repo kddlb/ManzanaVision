@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 @preconcurrency import AVFoundation
+import AppKit
 import Foundation
 import ManzanaPlayback
 import ManzanaTuner
 import ManzanaTV
 import Observation
+import UniformTypeIdentifiers
 
 /// App state: the session (live tuner, or recordings standing in for it),
 /// the channel list, and what the views show.
@@ -33,6 +35,16 @@ final class AppModel {
     private(set) var banner: Channel?
     var scan: ScanModel?
 
+    /// The recording in progress, if any
+    private(set) var recording: Recording?
+    private(set) var recordedBytes: Int64 = 0
+    /// Why the last recording stopped on its own, for an alert
+    var recordingError: String?
+    /// A channel change waiting on "stop the recording?"
+    var pendingZap: Channel?
+    /// The export in progress or just finished
+    private(set) var export: ExportJob?
+
     var deinterlace: DeinterlaceMode {
         didSet {
             engine.deinterlace = deinterlace
@@ -47,6 +59,8 @@ final class AppModel {
     private var entryTask: Task<Void, Never>?
     private var bannerTask: Task<Void, Never>?
     private var activity: NSObjectProtocol?
+    private var recordingActivity: NSObjectProtocol?
+    private var recordingTimer: Task<Void, Never>?
 
     init() {
         let defaults = UserDefaults.standard
@@ -54,6 +68,8 @@ final class AppModel {
         deinterlace = mode
         showOneSeg = defaults.object(forKey: "showOneSeg") as? Bool ?? false
         showHUD = defaults.bool(forKey: "showHUD")
+        recordingsFolder = defaults.string(forKey: "recordingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? Self.defaultRecordingsFolder
         engine = PlaybackEngine(videoRenderer: layer.sampleBufferRenderer, deinterlace: mode)
         layer.videoGravity = .resizeAspect
 
@@ -81,10 +97,23 @@ final class AppModel {
                     try? await Task.sleep(for: .milliseconds(500))
                     guard let self else { return }
                     stats = engine.currentStats()
+                    if let r = recording?.recorder {
+                        recordedBytes = r.bytesWritten
+                        if let e = r.error {
+                            stopRecording()
+                            recordingError = e.localizedDescription
+                        }
+                    }
                 }
             },
         ]
         reloadChannels()
+        // UI tests: export a file at launch (recordings mode only)
+        let env = ProcessInfo.processInfo.environment
+        if recordingsDirectory != nil, let source = env["MANZANA_EXPORT_SOURCE"],
+           let destination = env["MANZANA_EXPORT_DESTINATION"] {
+            exportRecording(URL(fileURLWithPath: source), to: URL(fileURLWithPath: destination))
+        }
         let last = defaults.string(forKey: lastChannelKey)
         if let channel = visibleChannels.first(where: { $0.id == last }) ?? visibleChannels.first {
             play(channel)
@@ -119,6 +148,11 @@ final class AppModel {
 
     func play(_ channel: Channel) {
         guard channel != current || status == .stopped else { return }
+        // one tuner: another channel would end the recording, so ask first
+        if let r = recording, r.recorder.channel != channel {
+            pendingZap = channel
+            return
+        }
         current = channel
         tmcc = nil
         signal = nil
@@ -185,6 +219,139 @@ final class AppModel {
     func cancelEntry() {
         entryTask?.cancel()
         entry = ""
+    }
+
+    // MARK: - recording
+
+    struct Recording {
+        let recorder: TSRecorder
+        let stopAt: Date?
+    }
+
+    static let defaultRecordingsFolder = URL.moviesDirectory.appendingPathComponent("ManzanaVision", isDirectory: true)
+
+    var recordingsFolder: URL {
+        didSet { UserDefaults.standard.set(recordingsFolder.path, forKey: "recordingsFolder") }
+    }
+
+    /// Something to record: a channel is on (or being tuned) and nothing's recording yet
+    var canRecord: Bool {
+        guard recording == nil, let current, scan == nil else { return false }
+        return status.channel == current
+    }
+
+    /// Records the current channel until stopped, or for a while
+    func startRecording(for duration: Duration? = nil) {
+        guard canRecord, let channel = current else { return }
+        let started = Date.now
+        do {
+            let url = TSRecorder.url(for: channel, in: recordingsFolder, at: started)
+            let recorder = try TSRecorder(channel: channel, url: url, started: started)
+            let stopAt = duration.map { started.addingTimeInterval(TimeInterval($0.components.seconds)) }
+            recording = Recording(recorder: recorder, stopAt: stopAt)
+            recordedBytes = 0
+            session.setRecorder(recorder)
+        } catch {
+            recordingError = error.localizedDescription
+            return
+        }
+        // keep the Mac awake even if the display sleeps
+        recordingActivity = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .userInitiated],
+                                                                  reason: "Recording live TV")
+        if let duration {
+            recordingTimer = Task {
+                try? await Task.sleep(for: duration)
+                if !Task.isCancelled { stopRecording() }
+            }
+        }
+    }
+
+    func stopRecording() {
+        guard let r = recording else { return }
+        session.setRecorder(nil)
+        r.recorder.finish()
+        recordedBytes = r.recorder.bytesWritten
+        recording = nil
+        recordingTimer?.cancel()
+        recordingTimer = nil
+        if let a = recordingActivity {
+            ProcessInfo.processInfo.endActivity(a)
+            recordingActivity = nil
+        }
+    }
+
+    func toggleRecording() {
+        if recording != nil { stopRecording() } else { startRecording() }
+    }
+
+    /// "Stop recording and switch" from the confirmation
+    func confirmZap() {
+        guard let c = pendingZap else { return }
+        pendingZap = nil
+        stopRecording()
+        play(c)
+    }
+
+    func showRecordings() {
+        try? FileManager.default.createDirectory(at: recordingsFolder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(recordingsFolder)
+    }
+
+    // MARK: - exporting
+
+    /// Asks for a recording, then where to put the movie
+    func chooseRecordingToExport() {
+        let open = NSOpenPanel()
+        open.allowedContentTypes = [UTType(filenameExtension: "ts") ?? .data]
+        open.directoryURL = recordingsFolder
+        open.message = String(localized: "Choose a recording to export for QuickTime.")
+        guard open.runModal() == .OK, let source = open.url else { return }
+        let save = NSSavePanel()
+        save.allowedContentTypes = [.mpeg4Movie]
+        save.directoryURL = source.deletingLastPathComponent()
+        save.nameFieldStringValue = source.deletingPathExtension().lastPathComponent + ".mp4"
+        guard save.runModal() == .OK, let destination = save.url else { return }
+        exportRecording(source, to: destination)
+    }
+
+    /// Converts a recording to HEVC/AAC MP4, deinterlaced like playback
+    func exportRecording(_ source: URL, to destination: URL) {
+        guard export?.isRunning != true else { return }
+        let job = ExportJob(name: destination.lastPathComponent, destination: destination)
+        export = job
+        guard let service = Exporter.firstServiceID(in: source) else {
+            job.state = .failed(Exporter.ExportError.noProgram.localizedDescription)
+            return
+        }
+        let exporter = Exporter(source: source, serviceID: service, destination: destination, deinterlace: deinterlace)
+        job.task = Task { [weak self] in
+            do {
+                _ = try await exporter.run { p in
+                    Task { @MainActor in if job.isRunning { job.state = .running(p) } }
+                }
+                job.state = .done
+                try? await Task.sleep(for: .seconds(20))
+                if self?.export === job { self?.export = nil }
+            } catch is CancellationError {
+                if self?.export === job { self?.export = nil }
+            } catch {
+                job.state = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func dismissExport() {
+        guard let job = export else { return }
+        if job.isRunning { job.task?.cancel() } else { export = nil }
+    }
+
+    /// Quitting: close a recording cleanly, and don't leave half an export behind
+    func applicationWillTerminate() {
+        stopRecording()
+        if let job = export, job.isRunning {
+            job.task?.cancel()
+            try? FileManager.default.removeItem(at: job.destination)
+        }
     }
 
     // MARK: - scanning
@@ -270,5 +437,39 @@ func errorMessage(_ error: any Error) -> String {
     case .noLock: String(localized: "No signal.")
     case .cancelled: String(localized: "Cancelled.")
     case .io, .noFrontend, .invalid, .notOpen: String(localized: "The tuner stopped responding. Unplug it and plug it back in.")
+    }
+}
+
+/// One export, for the progress badge
+@MainActor
+@Observable
+final class ExportJob {
+    enum State: Equatable {
+        case running(Double)
+        case done
+        case failed(String)
+    }
+
+    let name: String
+    let destination: URL
+    var state: State = .running(0)
+    var task: Task<Void, Never>?
+
+    init(name: String, destination: URL) {
+        self.name = name
+        self.destination = destination
+    }
+
+    var isRunning: Bool {
+        if case .running = state { true } else { false }
+    }
+
+    /// Running, done or failed, ignoring progress
+    var phase: Int {
+        switch state {
+        case .running: 0
+        case .done: 1
+        case .failed: 2
+        }
     }
 }

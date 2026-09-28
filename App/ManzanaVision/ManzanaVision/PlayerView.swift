@@ -31,7 +31,14 @@ struct PlayerView: View {
                     }
                 }
                 Spacer()
-                ReceptionBadge()
+                HStack(alignment: .bottom) {
+                    ReceptionBadge()
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 8) {
+                        ExportBadge()
+                        RecordingBadge()
+                    }
+                }
             }
             .padding()
             .animation(.snappy, value: model.showHUD)
@@ -39,6 +46,34 @@ struct PlayerView: View {
         .background(.black)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { NSApp.keyWindow?.toggleFullScreen(nil) }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if model.recording != nil {
+                    Button("Stop Recording", systemImage: "stop.circle.fill") { model.stopRecording() }
+                        .foregroundStyle(.red)
+                        .help("Stop recording")
+                } else {
+                    Button("Record", systemImage: "record.circle") { model.startRecording() }
+                        .disabled(!model.canRecord)
+                        .help("Record this channel")
+                }
+            }
+        }
+        .confirmationDialog("Stop Recording?", isPresented: Binding(get: { model.pendingZap != nil },
+                                                                   set: { if !$0 { model.pendingZap = nil } }),
+                            presenting: model.pendingZap) { channel in
+            Button("Stop Recording and Watch \(channel.virtual) \(channel.name)", role: .destructive) { model.confirmZap() }
+            Button("Keep Recording", role: .cancel) {}
+        } message: { _ in
+            Text("There's only one tuner, so changing channel ends the recording.")
+        }
+        .alert("Recording Stopped", isPresented: Binding(get: { model.recordingError != nil },
+                                                         set: { if !$0 { model.recordingError = nil } }),
+               presenting: model.recordingError) { _ in
+            Button("OK") {}
+        } message: { why in
+            Text(why)
+        }
         .navigationTitle(model.current.map { "\($0.virtual) \($0.name)" } ?? "ManzanaVision")
         .focusable()
         .focusEffectDisabled()
@@ -189,7 +224,7 @@ struct ReceptionBadge: View {
 
     var body: some View {
         let warning: Reception? = if case .playing(_, let r) = model.status, r != .good { r } else { nil }
-        HStack {
+        ZStack {
             if let r = warning {
                 Label(r == .poor ? LocalizedStringKey("Poor reception") : "Weak reception",
                       systemImage: r == .poor ? "wifi.exclamationmark" : "wifi")
@@ -200,9 +235,84 @@ struct ReceptionBadge: View {
                     .foregroundStyle(r == .poor ? .orange : .yellow)
                     .modifier(SlideIn(edge: .bottom))
             }
-            Spacer()
         }
         .animation(.snappy, value: warning)
+    }
+}
+
+/// An export's progress, then its result
+struct ExportBadge: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ZStack {
+            if let job = model.export {
+                HStack(spacing: 8) {
+                    switch job.state {
+                    case .running(let p):
+                        ProgressView(value: p).frame(width: 90)
+                        Text("Exporting \(job.name)").lineLimit(1).truncationMode(.middle)
+                        Text(p.formatted(.percent.precision(.fractionLength(0)))).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Button("Cancel Export", systemImage: "xmark.circle.fill") { model.dismissExport() }
+                    case .done:
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("Exported \(job.name)").lineLimit(1).truncationMode(.middle)
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([job.destination]) }
+                        Button("Dismiss", systemImage: "xmark.circle.fill") { model.dismissExport() }
+                    case .failed(let why):
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("Export failed: \(why)").lineLimit(2)
+                        Button("Dismiss", systemImage: "xmark.circle.fill") { model.dismissExport() }
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .foregroundStyle(.white)
+                .frame(maxWidth: 520, alignment: .trailing)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(.ultraThinMaterial, in: Capsule())
+                .modifier(SlideIn(edge: .bottom))
+            }
+        }
+        .animation(.snappy, value: model.export?.phase)  // not on every progress tick
+        .animation(.snappy, value: model.export == nil)
+    }
+}
+
+/// "● REC 0:12:34 · 1.2 GB" while recording
+struct RecordingBadge: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ZStack {
+            if let rec = model.recording {
+                TimelineView(.periodic(from: rec.recorder.started, by: 1)) { context in
+                    let elapsed = Duration.seconds(max(0, context.date.timeIntervalSince(rec.recorder.started).rounded(.down)))
+                    HStack(spacing: 6) {
+                        Image(systemName: "record.circle.fill")
+                            .foregroundStyle(.red)
+                            .symbolEffect(.pulse)
+                        Text("REC").fontWeight(.bold)
+                        Text(elapsed.formatted(.time(pattern: .hourMinuteSecond)))
+                        Text(model.recordedBytes.formatted(.byteCount(style: .file)))
+                            .foregroundStyle(.secondary)
+                        if let stopAt = rec.stopAt {
+                            Text("until \(stopAt.formatted(date: .omitted, time: .shortened))")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .monospacedDigit()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(.ultraThinMaterial, in: Capsule())
+                .modifier(SlideIn(edge: .bottom))
+            }
+        }
+        .animation(.snappy, value: model.recording == nil)
     }
 }
 

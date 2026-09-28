@@ -17,12 +17,13 @@ final class ManzanaVisionUITests: XCTestCase {
     }
 
     /// Starts the app on 9.1 in the given language (the tests find controls by their English labels)
-    private func launch(language: String = "en") {
+    private func launch(language: String = "en", arguments: [String] = [], environment: [String: String] = [:]) {
         app?.terminate()
         app = XCUIApplication()
         app.launchEnvironment["MANZANA_RECORDINGS"] = recordings
+        app.launchEnvironment.merge(environment) { $1 }
         app.launchArguments += ["-showOneSeg", "NO", "-lastRecordedChannel", "27:9728", "-showHUD", "NO",
-                                "-ApplePersistenceIgnoreState", "YES", "-AppleLanguages", "(\(language))"]
+                                "-ApplePersistenceIgnoreState", "YES", "-AppleLanguages", "(\(language))"] + arguments
         app.launch()
     }
 
@@ -131,5 +132,58 @@ final class ManzanaVisionUITests: XCTestCase {
         window.typeKey(.escape, modifierFlags: [])  // leaves full screen
         sleep(3)
         XCTAssertTrue(window.staticTexts["Tevex"].isHittable, "sidebar back after full screen")
+    }
+
+    func testRecording() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("mzv-uitest-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        launch(arguments: ["-recordingsFolder", folder.path])
+        XCTAssertTrue(waitForTitle("9.1"))
+        sleep(2)
+        window.typeKey("r", modifierFlags: .command)
+        XCTAssertTrue(window.staticTexts["REC"].waitForExistence(timeout: 5))
+        sleep(5)
+        snapshot("10 recording")
+
+        // changing channel asks first; keeping the recording stays on 9.1
+        window.typeKey(.downArrow, modifierFlags: .command)
+        let keep = window.buttons["Keep Recording"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5))
+        snapshot("11 stop recording?")
+        keep.click()
+        XCTAssertTrue(waitForTitle("9.1"))
+        XCTAssertTrue(window.staticTexts["REC"].exists)
+
+        window.typeKey(.downArrow, modifierFlags: .command)
+        let stop = window.buttons["Stop Recording and Watch 9.2 MEGA 2 HD"].firstMatch
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.click()
+        XCTAssertTrue(waitForTitle("9.2"))
+        XCTAssertTrue(window.staticTexts["REC"].waitForNonExistence(timeout: 5))
+
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        XCTAssertEqual(files.count, 1)
+        let file = try XCTUnwrap(files.first)
+        XCTAssertTrue(file.lastPathComponent.hasPrefix("MEGA HD 9.1 "), file.lastPathComponent)
+        let data = try Data(contentsOf: file)
+        XCTAssertGreaterThan(data.count, 500_000, "about 7 s of HD")
+        XCTAssertEqual(data.count % 188, 0)
+        XCTAssertTrue(stride(from: 0, to: data.count, by: 188).allSatisfy { data[$0] == 0x47 }, "every packet in sync")
+    }
+
+    func testExport() throws {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("mzv-uitest-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: out) }
+        launch(environment: ["MANZANA_EXPORT_SOURCE": recordings + "/rf27-5min-20s.ts",
+                             "MANZANA_EXPORT_DESTINATION": out.path])
+        let exporting = window.staticTexts["Exporting \(out.lastPathComponent)"]
+        XCTAssertTrue(exporting.waitForExistence(timeout: 10))
+        snapshot("12 exporting")
+        let done = window.staticTexts["Exported \(out.lastPathComponent)"]
+        XCTAssertTrue(done.waitForExistence(timeout: 60))
+        snapshot("13 exported")
+        XCTAssertTrue(window.buttons["Show in Finder"].exists)
+        let size = try FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int ?? 0
+        XCTAssertGreaterThan(size, 5_000_000, "about 20 s of 1080p60 HEVC")
     }
 }
