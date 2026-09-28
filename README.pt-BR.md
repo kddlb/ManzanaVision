@@ -1,18 +1,35 @@
 # ManzanaVision
 
-[English](README.md) · [Español](README.es.md) · **Português** · [日本語](README.ja.md)
+[English](README.md) · [Español](README.es.md) · **Português**
 
-Driver ISDB-T em espaço de usuário e scanner de canais para o sintonizador USB **DiBcom STK8096GP** no macOS, feito sobre a libusb. Sem extensão de kernel, sem DriverKit e sem `sudo`.
+Um app para Mac para assistir à TV digital aberta **ISDB-T** com um sintonizador USB **DiBcom STK8096GP**. Ele controla o dispositivo sozinho, em espaço de usuário, com a libusb: sem extensão de kernel, sem DriverKit, sem `sudo` e sem mais nada para instalar.
 
-O macOS não assume o controle deste dispositivo (USB `10b8:1fa0`), então um programa comum consegue abri-lo e fazer tudo o que o driver `dvb-usb-dib0700` do Linux faz: carregar o firmware da ponte, inicializar o demodulador e o sintonizador, sintonizar um canal e receber o transport stream MPEG.
+O macOS não assume o controle deste dispositivo (USB `10b8:1fa0`), então um programa comum consegue abri-lo e fazer tudo o que o driver `dvb-usb-dib0700` do Linux faz: carregar o firmware da ponte, inicializar o demodulador e o sintonizador, sintonizar um canal e receber o transport stream MPEG. O ManzanaVision faz isso e depois decodifica e reproduz a imagem e o som de forma nativa.
 
-## O que ele faz
+## Download
 
-- Varre os canais UHF 14 a 51 e informa cada multiplex que sintoniza, com:
-  - intensidade de sinal e SNR
-  - parâmetros TMCC (modo, intervalo de guarda e, por camada, modulação, taxa de código e segmentos), além de quais camadas estão sendo decodificadas
-  - os serviços do multiplex, com nome e número de canal virtual (por exemplo 9.1, 9.2 e 9.31), lidos de PAT/SDT/NIT
-- Sintoniza um canal e grava o TS em um arquivo que pode ser assistido no VLC ou no ffplay.
+Baixe o DMG em [Releases](https://github.com/kddlb/ManzanaVision/releases), abra-o e arraste o ManzanaVision para Aplicativos. O app é assinado com um Developer ID e notarizado pela Apple.
+
+- Um Mac com Apple silicon e macOS 27 ou posterior
+- Um DiBcom STK8096GP (`10b8:1fa0`) e uma antena UHF
+
+O firmware do sintonizador e a libusb já vêm dentro do app.
+
+## Usando o app
+
+- **Buscar** (botão da barra de ferramentas) sintoniza os canais UHF 14 a 51, ou o intervalo que você escolher, e mostra o que encontra em cada frequência. Na barra lateral, os canais ficam agrupados por emissora. Os serviços 1seg (celular) ficam ocultos, a menos que você os ative nos Ajustes.
+- **Trocar de canal:** clique em um, use ⌘↑/⌘↓ ou Page Up/Page Down, ou digite o número (`9.1`, ou só `9`) e pressione Return. O app lembra o último canal.
+- **Imagem:** 1080i, 1080p e 720p, com desentrelaçamento YADIF a 60 fps (outros modos nos Ajustes), além de serviços 1seg e de rádio.
+- **Informações do sinal** (⌘I) mostra SNR, nível, o sincronismo e a modulação de cada camada, erros, os formatos de vídeo e áudio, os buffers e os contadores de recuperação.
+- **Os problemas são explicados na tela:** sintonizador desconectado, em uso por outro programa, sem sinal, recepção fraca ou ruim. Depois de uma queda, a imagem fica desfocada enquanto o app ressintoniza sozinho, e a reprodução volta quando o sintonizador é conectado de novo.
+- **Tela cheia** mostra só a imagem: clique duas vezes nela e pressione Esc para sair. **Picture in Picture** fica no menu Canal (⌃⌘P).
+- O app está em inglês, espanhol e português do Brasil.
+
+A numeração dos canais segue o plano ABNT/SBTVD usado no Brasil, no Chile e no resto da América Latina: o canal *n* é centrado em 473 + 6·(n−14) + 1/7 MHz.
+
+## Ferramenta de linha de comando
+
+O `manzanavision` faz o mesmo pelo terminal e compartilha a lista de canais com o app (`~/Library/Application Support/ManzanaVision/channels.tsv`; dá para trocar com `MANZANA_CHANNELS`).
 
 ```
 $ ./manzanavision scan
@@ -26,73 +43,59 @@ RF 27  551.143 MHz  LOCK  strength  61%  SNR 20.5 dB
 4 muxes locked
 ```
 
-A numeração dos canais segue o plano ABNT/SBTVD usado no Brasil, no Chile e no restante da América Latina: o canal *n* fica centrado em 473 + 6·(n−14) + 1/7 MHz.
-
-## Requisitos
-
-- macOS em Apple silicon ou Intel
-- Command Line Tools do Xcode (`xcode-select --install`)
-- libusb e pkg-config: `brew install libusb pkg-config`
-- Um DiBcom STK8096GP (`10b8:1fa0`) e uma antena UHF
-
-## Compilação
-
-```sh
-make
-```
-
-O firmware da ponte DiB0700 (`firmware/dvb-usb-dib0700-1.20.fw`, do linux-firmware) já vem incluído. A DiBcom permite redistribuí-lo nos termos de [`firmware/LICENSE.dib0700`](firmware/LICENSE.dib0700). Com `MANZANA_FIRMWARE` você pode usar outra cópia.
-
-## Uso
-
 ```sh
 ./manzanavision probe                  # carrega o firmware e identifica os chips
 ./manzanavision scan                   # varre UHF 14–51 e salva a lista de canais
 ./manzanavision channels               # mostra os canais salvos
-./manzanavision watch 9.1 | ffplay -   # assistir a um canal (também: watch 9, watch "MEGA HD")
+./manzanavision watch 9.1 | ffplay -   # assiste a um canal (também: watch 9, watch "MEGA HD")
 ./manzanavision scan --from 20 --to 40 --json
-./manzanavision tune 27                # sintoniza um canal e lista seus serviços
+./manzanavision tune 27                # sintoniza um canal e lista os serviços
 ./manzanavision tune 27 --dump rf27.ts --seconds 30
-./manzanavision signal 23 --beep     # medidor de sinal ao vivo para apontar a antena
+./manzanavision signal 23 --beep       # medidor de sinal ao vivo para apontar a antena
 ```
 
-`signal` atualiza quatro vezes por segundo o SNR, o nível, o travamento de cada camada e os pacotes com erros não corrigíveis por segundo, e sintoniza de novo se o sinal for perdido. Com `--beep`, ele toca um tom como o dos receptores de satélite: o tom sobe com o SNR, fica contínuo quando todas as camadas estão travadas, intermitente quando só algumas estão e silencia quando não há sinal travado. Dá para apontar a antena só de ouvido.
+- **`scan`** informa cada multiplex que sintoniza: intensidade de sinal e SNR, os parâmetros TMCC (modo, intervalo de guarda e, por camada, modulação, taxa de código e segmentos) e quais camadas estão decodificando, e os serviços com nomes e números de canal virtual lidos da PAT/SDT/NIT. Tudo entra na lista de canais; um multiplex que não sintoniza numa busca posterior mantém os canais salvos.
+- **`signal`** atualiza SNR, nível, o sincronismo de cada camada e os pacotes não corrigíveis por segundo quatro vezes por segundo. Com `--beep`, toca um tom de busca como o dos receptores de satélite: o tom sobe com o SNR, é contínuo quando todas as camadas estão sincronizadas, intermitente quando só algumas estão e fica em silêncio sem sincronismo. Dá para apontar a antena de ouvido.
+- **`watch`** entrega um único programa em MPEG-TS, com uma PAT que lista só esse serviço, então ffplay, mpv ou VLC (`| /Applications/VLC.app/Contents/MacOS/VLC -`) o abrem sem opções. Use `--output ARQUIVO` para gravar. Se o sinal cair por 2 segundos, ele ressintoniza e continua.
+- `-v` liga o log de depuração dos drivers e `-vv` acrescenta um rastreamento de I²C. Eles vêm antes do comando, por exemplo `./manzanavision -v tune 27`.
 
-O `scan` junta o que encontra em `~/Library/Application Support/ManzanaVision/channels.tsv` (dá para trocar com `MANZANA_CHANNELS`), um arquivo de texto separado por tabulações que você pode ler ou editar. Se um multiplex não sintonizar numa varredura posterior, os canais salvos dele são mantidos. O `watch` sintoniza um canal salvo e grava só aquele programa como MPEG-TS, com uma PAT que lista apenas esse serviço, sua PMT e seus streams, então ffplay, mpv ou VLC (`| /Applications/VLC.app/Contents/MacOS/VLC -`) abrem sem opções extras. Com `--output ARQUIVO`, ele grava em vez de exibir. Se o sinal cair por 2 segundos, o `watch` sintoniza de novo sozinho e continua, e o player só vê uma pequena interrupção. Ele para quando o player é fechado ou com Ctrl-C.
+Para assistir a uma captura no VLC, acrescente `--ts-standard=dvb`. Sem isso, o VLC supõe texto ARIB japonês e os nomes dos serviços latino-americanos aparecem em kanji.
 
-`-v` liga o log de depuração dos drivers e `-vv` acrescenta um trace de I²C. Coloque-os antes do comando, por exemplo `./manzanavision -v tune 27`.
+## Compilação
 
-Para assistir a uma captura, diga ao VLC para tratar o stream como DVB, para que os nomes dos serviços apareçam corretamente:
+O firmware (`firmware/dvb-usb-dib0700-1.20.fw`, do linux-firmware) está incluído; a DiBcom permite redistribuí-lo nos termos de [`firmware/LICENSE.dib0700`](firmware/LICENSE.dib0700). Defina `MANZANA_FIRMWARE` para usar outra cópia.
 
-```sh
-/Applications/VLC.app/Contents/MacOS/VLC --ts-standard=dvb rf27.ts
-```
-
-Caso contrário, o VLC assume texto japonês ARIB e os nomes latino-americanos aparecem como kanji.
+- **App:** abra `App/ManzanaVision/ManzanaVision.xcodeproj` no Xcode 27 e execute. Defina `MANZANA_RECORDINGS` com uma pasta de capturas `rfNN….ts` para usá-las no lugar do sintonizador.
+- **Bibliotecas e ferramenta de desenvolvimento:** `swift build` e `swift test` (pacote Swift na raiz, com a libusb compilada a partir de `vendor/libusb`).
+- **Ferramenta de linha de comando:** `make`, que precisa de `brew install libusb pkg-config`.
+- **Publicação:** `scripts/release.sh` arquiva, assina, notariza e grampeia o app e o DMG.
 
 ## Como funciona
 
 ```
-src/bridge/     ponte USB DiB0700 sobre a libusb: firmware, GPIO, clock, I²C, streaming do TS
-src/frontends/  demodulador DiB8000 + sintonizador DiB0090, copiados sem alterações do Linux
-src/compat/     a pequena camada de compatibilidade com a API do kernel de que esses drivers precisam
-src/board/      código da placa STK8096GP, copiado do dib0700_devices.c do Linux
-src/ts/         leitura de PAT/SDT/NIT e números de canal virtual ISDB-T
-src/scan.c      sintonizar → ler TMCC → coletar PSI → informar
+src/bridge/          ponte USB DiB0700 sobre a libusb: firmware, GPIO, clock, I²C, streaming de TS
+src/frontends/       demodulador DiB8000 + sintonizador DiB0090, trazidos sem alterações do Linux
+src/compat/          a pequena camada de compatibilidade com a API do kernel usada por esses drivers
+src/board/           código da placa STK8096GP, copiado do dib0700_devices.c do Linux
+src/ts/              análise de PAT/SDT/NIT e números de canal virtual ISDB-T
+src/core/            a API em C (manzana.h): sintonizar, varrer, transmitir, filtro de programa, lista de canais
+src/cli/             o comando manzanavision
+Sources/ManzanaTuner     actor Swift em volta do núcleo em C, conexão a quente, firmware e lista de canais
+Sources/ManzanaStream    demultiplexador TS e análise de H.264 e AAC (ADTS, LATM)
+Sources/ManzanaPlayback  decodificação com VideoToolbox, desentrelaçamento com Metal, áudio, sincronia A/V
+Sources/ManzanaTV        a sessão ao vivo: estado, recepção, ressintonia, busca
+App/                     o app em SwiftUI
 ```
 
-Os drivers do demodulador e do sintonizador somam cerca de 7.000 linhas de máquinas de estado sensíveis a tempo, por isso são compilados **sem modificações** a partir da árvore do Linux em vez de reescritos. O `src/frontends/PATCHES.md` registra qualquer mudança local (até agora, nenhuma), para que os arquivos possam acompanhar o upstream.
+Os drivers do demodulador e do sintonizador somam cerca de 7.000 linhas de máquinas de estado sensíveis a tempo, por isso são compilados **sem modificações** a partir da árvore do Linux, em vez de reescritos. `src/frontends/PATCHES.md` registra qualquer alteração local (até agora nenhuma), para que os arquivos possam acompanhar o upstream.
 
-Notas da inicialização no hardware real:
+Notas da colocação em funcionamento no hardware real:
 
-- O firmware da ponte fica na RAM. O dispositivo liga "a frio" e precisa receber o firmware a cada vez que é conectado. `probe`, `scan` e `tune` fazem isso automaticamente.
-- O Linux controla esta placa com os comandos I²C antigos da ponte (`0x02`/`0x03`). Os novos (`0x12`/`0x13`) travam assim que o DiB8000 passa para o clock do PLL.
-- Se um multiplex sintoniza mas mostra `B: … NO LOCK`, o sinal não é suficiente para a camada full-seg em 64QAM, embora a camada one-seg continue sendo decodificada. É um problema de antena, não do driver.
-
-## Situação
-
-O MVP funciona: no dispositivo do autor, o scanner sintoniza e lista os serviços de todo multiplex com sinal utilizável, e as capturas de TS saem sem perdas (17,3 Mbit/s, sem erros de continuidade). Já dá para assistir ao vivo ligando o `watch` a um player. Os próximos passos podem incluir um guia de programação (EPG), servir os canais na rede como um sintonizador compatível com HDHomeRun e um app para Mac.
+- O firmware da ponte fica na RAM. O dispositivo liga "frio" e precisa do firmware carregado a cada reconexão; o app e a ferramenta fazem isso sozinhos.
+- O Linux controla esta placa com as requisições I²C antigas da ponte (`0x02`/`0x03`). As mais novas (`0x12`/`0x13`) travam assim que o DiB8000 passa para o clock do PLL.
+- Se um multiplex sintoniza mas mostra `B: … NO LOCK`, o sinal está fraco demais para a camada full-seg em 64QAM, enquanto a camada 1seg ainda decodifica. É um problema de antena, não do driver.
+- As emissoras daqui transmitem 1080i como imagens de campo (PAFF) ou MBAFF, e HE-AAC em LATM ou AAC em ADTS (uma rotula ADTS como LATM). A reprodução junta os campos e faz o desentrelaçamento na GPU, porque o desentrelaçador do VideoToolbox só entrega 30 fps.
 
 ## Licença
 
-GPL-2.0-only, a mesma dos drivers do Linux em que se baseia. Veja [LICENSE](LICENSE).
+GPL-2.0-only, a mesma dos drivers do Linux em que se baseia. Veja [LICENSE](LICENSE). A libusb é LGPL-2.1; o firmware tem licença própria (veja acima).
