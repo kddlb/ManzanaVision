@@ -37,6 +37,8 @@ final class AppModel {
     private(set) var entry = ""
     /// The channel banner shown briefly after a zap
     private(set) var banner: Channel?
+    /// After a zap, until the new channel's picture is up
+    private(set) var pictureHidden = false
     var scan: ScanModel?
 
     /// The recording in progress, if any
@@ -73,6 +75,7 @@ final class AppModel {
     private var tasks: [Task<Void, Never>] = []
     private var entryTask: Task<Void, Never>?
     private var bannerTask: Task<Void, Never>?
+    private var pictureTask: Task<Void, Never>?
     private var activity: NSObjectProtocol?
     private var recordingActivity: NSObjectProtocol?
     private var recordingTimer: Task<Void, Never>?
@@ -178,8 +181,30 @@ final class AppModel {
         tmcc = nil
         signal = nil
         UserDefaults.standard.set(channel.id, forKey: lastChannelKey)
+        hidePictureUntilPlaying()
         session.play(channel)
         showBanner(channel)
+    }
+
+    /// The engine keeps the last picture through a restart, which suits a dropout
+    /// but not a zap: the old channel would sit under the new one's banner, or
+    /// under "no signal" for good. So it's hidden until the new stream plays.
+    private func hidePictureUntilPlaying() {
+        let old = engine.currentStats().epoch  // every stream brings a new epoch
+        pictureHidden = true
+        pictureTask?.cancel()
+        pictureTask = Task { [weak self, engine] in
+            while !Task.isCancelled {
+                let s = engine.currentStats()
+                if s.epoch != old && s.state == .playing {
+                    // the clock starts `latency` after the start point; until then the old picture shows
+                    try? await Task.sleep(for: .seconds(engine.latency))
+                    if !Task.isCancelled { self?.pictureHidden = false }
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
     }
 
     func step(_ delta: Int) {

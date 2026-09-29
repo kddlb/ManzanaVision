@@ -21,6 +21,12 @@ struct PlayerView: View {
                 .saturation(lost ? 0.2 : 1)
                 .brightness(lost ? -0.2 : 0)
                 .animation(lost ? .easeIn(duration: 4) : .easeOut(duration: 0.4), value: lost)
+                // a zap defocuses the old channel away quickly; the new one comes into focus once it's playing
+                .blur(radius: model.pictureHidden ? 12 : 0, opaque: true)
+                .scaleEffect(model.pictureHidden ? 0.97 : 1)
+                .opacity(model.pictureHidden ? 0 : 1)
+                .animation(model.pictureHidden ? .easeIn(duration: 0.2) : .easeOut(duration: 0.35),
+                           value: model.pictureHidden)
                 .allowsHitTesting(false)
             if model.pictureInPicture {
                 // the video layer is sized for the PiP panel meanwhile
