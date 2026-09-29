@@ -3,6 +3,8 @@
 import AppKit
 import Foundation
 import ManzanaPlayback
+import ManzanaStream
+import MediaAccessibility
 import ManzanaTuner
 import ManzanaTV
 import Observation
@@ -25,6 +27,8 @@ final class AppModel {
     private(set) var signal: Signal?
     private(set) var tmcc: TMCC?
     private(set) var stats = PlaybackStats()
+    /// The caption screen the broadcast shows now (empty when there's none)
+    private(set) var caption = CaptionPage()
 
     var showHUD: Bool {
         didSet { UserDefaults.standard.set(showHUD, forKey: "showHUD") }
@@ -54,6 +58,17 @@ final class AppModel {
     var showOneSeg: Bool {
         didSet { UserDefaults.standard.set(showOneSeg, forKey: "showOneSeg") }
     }
+    /// Closed captions, on channels that have them
+    var showCaptions: Bool {
+        didSet {
+            UserDefaults.standard.set(showCaptions, forKey: "showCaptions")
+            engine.burnInCaptions(pictureInPicture && showCaptions)
+        }
+    }
+    /// Picture in Picture shows only the video layer, so captions are drawn into the picture meanwhile
+    var pictureInPicture = false {
+        didSet { engine.burnInCaptions(pictureInPicture && showCaptions) }
+    }
 
     private var tasks: [Task<Void, Never>] = []
     private var entryTask: Task<Void, Never>?
@@ -67,6 +82,9 @@ final class AppModel {
         let mode = DeinterlaceMode(rawValue: defaults.string(forKey: "deinterlace") ?? "") ?? .auto
         deinterlace = mode
         showOneSeg = defaults.object(forKey: "showOneSeg") as? Bool ?? false
+        // until chosen here, follow Accessibility → Captions → "Prefer closed captions and SDH"
+        showCaptions = defaults.object(forKey: "showCaptions") as? Bool
+            ?? (MACaptionAppearanceGetDisplayType(.user) == .alwaysOn)
         showHUD = defaults.bool(forKey: "showHUD")
         recordingsFolder = defaults.string(forKey: "recordingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? Self.defaultRecordingsFolder
@@ -91,6 +109,9 @@ final class AppModel {
             },
             Task { [weak self] in
                 for await t in session.tmccUpdates { self?.tmcc = t }
+            },
+            Task { [weak self, engine] in
+                for await page in engine.captions { self?.caption = page }
             },
             Task { [weak self] in
                 while !Task.isCancelled {

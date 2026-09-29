@@ -220,6 +220,8 @@ const struct mzv_channel *mzv_channels_find(const struct mzv_channel_list *list,
 struct mzv_es {
 	uint8_t stream_type;	/* 0x1b H.264, 0x0f AAC ADTS, 0x11 AAC LATM, ... */
 	uint16_t pid;
+	int16_t component_tag;		/* stream_identifier_descriptor, -1 if absent */
+	uint16_t data_component_id;	/* data_component_descriptor (0x0008 = ARIB captions), 0 if absent */
 };
 
 struct mzv_program {

@@ -565,6 +565,22 @@
         }
       }
     },
+    "Captions": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtítulos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legendas"
+          }
+        }
+      }
+    },
     "Channel": {
       "localizations": {
         "es": {
@@ -645,6 +661,22 @@
         }
       }
     },
+    "Choose Channel → Picture in Picture to bring it back.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige Canal → Imagen dentro de imagen para traerlo de vuelta."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha Canal → Picture in Picture para trazê-lo de volta."
+          }
+        }
+      }
+    },
     "Choose…": {
       "localizations": {
         "es": {
@@ -657,6 +689,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escolher…"
+          }
+        }
+      }
+    },
+    "Closed Captions": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtítulos ocultos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legendas ocultas"
           }
         }
       }
@@ -1045,6 +1093,22 @@
         }
       }
     },
+    "hidden": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ocultos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ocultas"
+          }
+        }
+      }
+    },
     "Hide Signal Info": {
       "localizations": {
         "es": {
@@ -1208,6 +1272,22 @@
         }
       }
     },
+    "none": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no hay"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nenhuma"
+          }
+        }
+      }
+    },
     "Nothing": {
       "localizations": {
         "es": {
@@ -1300,6 +1380,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reprodução"
+          }
+        }
+      }
+    },
+    "Playing in Picture in Picture": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduciendo en imagen dentro de imagen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduzindo em Picture in Picture"
           }
         }
       }
@@ -1546,6 +1642,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Recuperação"
+          }
+        }
+      }
+    },
+    "Show closed captions": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar subtítulos ocultos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar legendas ocultas"
+          }
+        }
+      }
+    },
+    "shown": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "visibles"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "visíveis"
           }
         }
       }
@@ -2225,6 +2353,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vídeo"
+          }
+        }
+      }
+    },
+    "waiting": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "esperando"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aguardando"
           }
         }
       }

@@ -33,6 +33,7 @@ struct SignalHUD: View {
             Divider()
             row("Video", "\(videoText(s))")
             row("Audio", "\(s.audioDescription.isEmpty ? "—" : s.audioDescription)")
+            row("Captions", "\(captionText(s))")
             row("Buffer", "video \(s.videoBuffer, specifier: "%.1f") s, audio \(s.audioBuffer, specifier: "%.1f") s")
             row("Damage", "\(s.continuityErrors) CC errors, \(s.decodeErrors) decode errors")
             row("Recovery", "\(s.restarts) restarts, \(s.stalls) stalls, \(s.rebuffers) rebuffers")
@@ -53,6 +54,14 @@ struct SignalHUD: View {
             if s.deinterlaceGPUms > 0 { text += String(format: " %.1f ms", locale: .current, s.deinterlaceGPUms) }
         }
         return text
+    }
+
+    private func captionText(_ s: PlaybackStats) -> String {
+        guard s.hasCaptions else { return String(localized: "none") }
+        let language = s.captionLanguage.flatMap { Locale.current.localizedString(forLanguageCode: $0) }
+            ?? String(localized: "waiting")
+        let state = model.showCaptions ? String(localized: "shown") : String(localized: "hidden")
+        return "\(language) · \(state) · \(s.captionScreens)"
     }
 
     private func row(_ label: LocalizedStringKey, _ value: LocalizedStringKey) -> some View {

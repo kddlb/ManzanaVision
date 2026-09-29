@@ -195,6 +195,20 @@ static void parse_pmt(struct psi_parser *p, const uint8_t *sec, int len)
 
 		prog->es[prog->nes].stream_type = sec[i];
 		prog->es[prog->nes].pid = ((sec[i + 1] & 0x1f) << 8) | sec[i + 2];
+		prog->es[prog->nes].component_tag = -1;
+		prog->es[prog->nes].data_component_id = 0;
+		/* ARIB captions are stream_type 0x06 told apart by these two */
+		for (int d = i + 5; d + 2 <= i + 5 + esil && d + 2 <= len - 4;) {
+			int tag = sec[d], dlen = sec[d + 1];
+
+			if (d + 2 + dlen > i + 5 + esil)
+				break;
+			if (tag == 0x52 && dlen >= 1)
+				prog->es[prog->nes].component_tag = sec[d + 2];
+			else if (tag == 0xfd && dlen >= 2)
+				prog->es[prog->nes].data_component_id = (sec[d + 2] << 8) | sec[d + 3];
+			d += 2 + dlen;
+		}
 		prog->nes++;
 		i += 5 + esil;
 	}

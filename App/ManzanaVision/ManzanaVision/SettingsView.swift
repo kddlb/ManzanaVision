@@ -18,6 +18,7 @@ struct SettingsView: View {
                     Text("Off").tag(DeinterlaceMode.off)
                 }
                 Toggle("Show one-seg (mobile) channels", isOn: $model.showOneSeg)
+                Toggle("Show closed captions", isOn: $model.showCaptions)
             }
             .tabItem { Label("Playback", systemImage: "play.rectangle") }
 

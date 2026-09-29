@@ -2,6 +2,7 @@
 @preconcurrency import AVFoundation
 import CoreMedia
 import Foundation
+import ManzanaStream
 import VideoToolbox
 
 /// Decodes compressed video with VideoToolbox, deinterlaces interlaced frames
@@ -51,6 +52,8 @@ final class VideoPipeline: @unchecked Sendable {
     private var firstSubmit: UInt64 = 0    // uptime ns, since the last flush/reset
     private var lastSubmit: UInt64 = 0
     private var lastOutput: UInt64 = 0
+    /// While set, the caption screen for each frame's time is drawn into it
+    private var captionSource: (@Sendable (CMTime) -> CaptionPage?)?
 
     // queue-confined
     private typealias Decoded = (image: CVPixelBuffer, pts: CMTime, duration: CMTime)
@@ -60,6 +63,7 @@ final class VideoPipeline: @unchecked Sendable {
     private var history: [(image: CVPixelBuffer, pts: CMTime, duration: CMTime, tff: Bool)] = []
     private var stats = Stats()
     private var lastOutputPTS: CMTime = .invalid
+    private var burnIn: CaptionBurnIn?
 
     init(receiver: sending AVSampleBufferVideoRenderer.Receiver, timebase: CMTimebase, mode: DeinterlaceMode) {
         events = receiver.renderingEventsAfterFinishedEnqueuing
@@ -97,6 +101,11 @@ final class VideoPipeline: @unchecked Sendable {
     }
 
     func currentStats() -> Stats { queue.sync { stats } }
+
+    /// Burns captions into the pictures (Picture in Picture shows nothing else); nil stops
+    func setCaptionSource(_ source: (@Sendable (CMTime) -> CaptionPage?)?) {
+        lock.withLock { captionSource = source }
+    }
 
     /// Set when the renderer refused a frame in a way only a restart fixes
     func takeNeedsRestart() -> Bool {
@@ -311,6 +320,11 @@ final class VideoPipeline: @unchecked Sendable {
             return
         }
         guard let receiver, let timebase else { return }
+        var image = image
+        if let source = lock.withLock({ captionSource }), let page = source(pts) {
+            if burnIn == nil { burnIn = CaptionBurnIn() }
+            if let captioned = burnIn?.composite(image, page: page) { image = captioned }
+        }
         let key = "\(CVPixelBufferGetWidth(image))x\(CVPixelBufferGetHeight(image))"
         var format = outputFormats[key]
         if format == nil || !CMVideoFormatDescriptionMatchesImageBuffer(format!, imageBuffer: image) {

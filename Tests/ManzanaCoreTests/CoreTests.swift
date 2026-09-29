@@ -126,6 +126,18 @@ struct ProgramFilter {
         }
         #expect(inPAT == [0x2600])
     }
+
+    @Test func captionStreamDescriptors() throws {
+        let (_, program) = try filtered(sid: 0x2600)
+        let prog = try #require(program)
+        let es = withUnsafeBytes(of: prog.es) { raw in Array(raw.bindMemory(to: mzv_es.self).prefix(Int(prog.nes))) }
+        // 9.1: H.264, LATM, and captions (stream_identifier 0x30, data_component 0x0008)
+        let captions = try #require(es.first { $0.stream_type == 0x06 })
+        #expect(captions.pid == 0x68)
+        #expect(captions.component_tag == 0x30)
+        #expect(captions.data_component_id == 0x0008)
+        #expect(es.filter { $0.stream_type != 0x06 }.allSatisfy { $0.component_tag == -1 && $0.data_component_id == 0 })
+    }
 }
 
 @Suite struct ChannelList {

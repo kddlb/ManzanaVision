@@ -47,8 +47,9 @@ func export(_ args: [String]) {
     switch outcome! {
     case .success(let s):
         let took = Date().timeIntervalSince(started)
-        print(String(format: "%@: %.1f s of video in %.1f s (%.1f×), %d frames, %d audio buffers, %d skipped, %d decode errors, %.1f s of silence filled",
-                     paths[1], s.duration, took, s.duration / took, s.videoFrames, s.audioBuffers, s.skipped, s.decodeErrors, s.silence))
+        print(String(format: "%@: %.1f s of video in %.1f s (%.1f×), %d frames, %d audio buffers, %d skipped, %d decode errors, %.1f s of silence filled, %d captions",
+                     paths[1], s.duration, took, s.duration / took, s.videoFrames, s.audioBuffers, s.skipped, s.decodeErrors, s.silence,
+                     s.captions))
     case .failure(let e):
         FileHandle.standardError.write("export failed: \(e.localizedDescription)\n".data(using: .utf8)!)
         exit(1)

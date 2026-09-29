@@ -21,6 +21,7 @@ The tuner firmware and libusb are built into the app.
 - **Changing channels:** click one, press ⌘↑/⌘↓ or Page Up/Down, or type its number (`9.1`, or just `9`) and press Return. The app remembers the last channel.
 - **Picture:** 1080i, 1080p and 720p, deinterlaced with YADIF at 60 fps (other modes in Settings), plus one-seg and radio services.
 - **Signal info** (⌘I) shows SNR, level, each layer's lock and modulation, errors, the video and audio formats, buffer levels and recovery counters.
+- **Closed captions** (⇧⌘C, or Channel → Closed Captions) show a channel's ARIB/ABNT captions where the broadcaster places them, in its colours. They also show in Picture in Picture, and exports for QuickTime carry them as a subtitle track you can turn on. They start on by default if Accessibility → Captions is set to prefer closed captions.
 - **Problems are explained on screen:** tuner not plugged in, in use by another program, no signal, weak or poor reception. After a dropout the picture blurs while the app re-tunes by itself, and it picks up again when the stick is plugged back in.
 - **Full screen** shows nothing but the picture: double-click it, press Esc to leave. **Picture in Picture** is in the Channel menu (⌃⌘P).
 - **Recording** (⌘R, or Channel → Record For) saves the channel exactly as broadcast, in MPEG-TS, to Movies/ManzanaVision; VLC, IINA and mpv play it. **File → Export Recording for QuickTime** turns a recording into an MP4 (HEVC, deinterlaced to 60 fps, AAC) for QuickTime, Photos or an iPhone.

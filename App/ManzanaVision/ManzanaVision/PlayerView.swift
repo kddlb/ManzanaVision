@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 import ManzanaPlayback
+import ManzanaStream
 import ManzanaTuner
 import ManzanaTV
 import SwiftUI
@@ -21,6 +22,16 @@ struct PlayerView: View {
                 .brightness(lost ? -0.2 : 0)
                 .animation(lost ? .easeIn(duration: 4) : .easeOut(duration: 0.4), value: lost)
                 .allowsHitTesting(false)
+            if model.pictureInPicture {
+                // the video layer is sized for the PiP panel meanwhile
+                ContentUnavailableView("Playing in Picture in Picture", systemImage: "pip",
+                                       description: Text("Choose Channel → Picture in Picture to bring it back."))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.black)
+                    .transition(.opacity)
+            }
+            CaptionOverlay()
             StatusOverlay(showingScan: $showingScan)
             VStack {
                 HStack(alignment: .top) {
@@ -178,6 +189,89 @@ struct StatusOverlay: View {
         .padding(24)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .transition(.scale(0.9).combined(with: .opacity))
+    }
+}
+
+/// Closed captions, laid out on the picture where the broadcaster placed them
+struct CaptionOverlay: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let page = model.caption
+        let playing = if case .playing = model.status { true } else { false }
+        GeometryReader { geo in
+            // in Picture in Picture the captions are in the picture instead
+            if model.showCaptions, !model.pictureInPicture, playing, !page.isEmpty {
+                let picture = pictureRect(in: geo.size)
+                let scale = picture.height / CGFloat(page.height)
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(page.lines.enumerated()), id: \.offset) { _, line in
+                        CaptionLineView(line: line, scale: scale)
+                            .frame(maxWidth: max(0, picture.maxX - picture.minX - CGFloat(line.x) * scale), alignment: .leading)
+                            .offset(x: picture.minX + CGFloat(line.x) * scale, y: picture.minY + CGFloat(line.y) * scale)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(page.text)
+                .accessibilityAddTraits(.updatesFrequently)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Where the picture is drawn: aspect-fit, like the video layer
+    private func pictureRect(in size: CGSize) -> CGRect {
+        let video = model.stats.videoSize
+        let aspect = video.width > 0 && video.height > 0 ? video.width / video.height
+            : CGFloat(model.caption.width) / CGFloat(model.caption.height)
+        let width = min(size.width, size.height * aspect)
+        let height = width / aspect
+        return CGRect(x: (size.width - width) / 2, y: (size.height - height) / 2, width: width, height: height)
+    }
+}
+
+/// One caption row: its runs in their colours, on the broadcaster's background
+struct CaptionLineView: View {
+    let line: CaptionLine
+    let scale: CGFloat
+
+    var body: some View {
+        let background = line.runs.first?.background ?? .clear
+        let uniform = line.runs.allSatisfy { $0.background == background }
+        let fontSize = CGFloat(line.runs.map(\.fontSize).max() ?? 24) * scale
+        Text(attributed(perRunBackground: !uniform))
+            .font(.system(size: fontSize * 0.9, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .padding(.horizontal, uniform && background.alpha > 0 ? fontSize * 0.2 : 0)
+            .frame(height: CGFloat(line.height) * scale)
+            .background(uniform ? Color(background) : .clear)
+            // captions with no box of their own still need to stand out from the picture
+            .shadow(color: .black.opacity(background.alpha == 0 ? 0.9 : 0), radius: 2)
+    }
+
+    private func attributed(perRunBackground: Bool) -> AttributedString {
+        var text = AttributedString()
+        for run in line.runs {
+            var part = AttributedString(run.text)
+            part.foregroundColor = Color(run.foreground)
+            if perRunBackground { part.backgroundColor = Color(run.background) }
+            if run.underline { part.underlineStyle = .single }
+            if run.italic || run.bold {
+                part.font = .system(size: CGFloat(run.fontSize) * scale * 0.9,
+                                    weight: run.bold ? .bold : .medium).italic(run.italic)
+            }
+            text += part
+        }
+        return text
+    }
+}
+
+extension Color {
+    init(_ c: CaptionColor) {
+        self.init(.sRGB, red: Double(c.red) / 255, green: Double(c.green) / 255, blue: Double(c.blue) / 255,
+                  opacity: Double(c.alpha) / 255)
     }
 }
 

@@ -11,6 +11,7 @@
 		588DA62EB1A9990FAABEA87C /* ManzanaTV in Frameworks */ = {isa = PBXBuildFile; productRef = 0B254247A4E88DC957D2C08F /* ManzanaTV */; };
 		82E8F3C443B717AC01EACC52 /* ManzanaTuner in Frameworks */ = {isa = PBXBuildFile; productRef = EA96DE47D65F6F2D39D0919D /* ManzanaTuner */; };
 		8881FC9942FA531E7A78860B /* ManzanaPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */; };
+		5C1A7E2B9D3F4A6B8C0D1E2F /* ManzanaStream in Frameworks */ = {isa = PBXBuildFile; productRef = 6D2B8F3CAE404B7C9D1E2F30 /* ManzanaStream */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +63,7 @@
 				588DA62EB1A9990FAABEA87C /* ManzanaTV in Frameworks */,
 				82E8F3C443B717AC01EACC52 /* ManzanaTuner in Frameworks */,
 				8881FC9942FA531E7A78860B /* ManzanaPlayback in Frameworks */,
+				5C1A7E2B9D3F4A6B8C0D1E2F /* ManzanaStream in Frameworks */,
 			);
 		};
 		0A81CE10306B1708002D6C9F /* Frameworks */ = {
@@ -120,6 +122,7 @@
 				0B254247A4E88DC957D2C08F /* ManzanaTV */,
 				EA96DE47D65F6F2D39D0919D /* ManzanaTuner */,
 				3123E55F5D9BE440D2314BF7 /* ManzanaPlayback */,
+				6D2B8F3CAE404B7C9D1E2F30 /* ManzanaStream */,
 			);
 			productName = ManzanaVision;
 			productReference = 0A81CE06306B1707002D6C9F /* ManzanaVision.app */;
@@ -654,6 +657,10 @@
 		EA96DE47D65F6F2D39D0919D /* ManzanaTuner */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ManzanaTuner;
+		};
+		6D2B8F3CAE404B7C9D1E2F30 /* ManzanaStream */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ManzanaStream;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

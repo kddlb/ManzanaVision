@@ -2,18 +2,37 @@
 @preconcurrency import AVFoundation
 import CoreMedia
 import Foundation
+import ManzanaCore
 import ManzanaStream
 
 /// An elementary stream of the program being played
 public struct ProgramStream: Sendable, Equatable {
     public var pid: UInt16
     public var streamType: UInt8
-    public init(pid: UInt16, streamType: UInt8) {
+    /// From the stream_identifier_descriptor
+    public var componentTag: UInt8?
+    /// From the data_component_descriptor
+    public var dataComponentID: UInt16?
+    public init(pid: UInt16, streamType: UInt8, componentTag: UInt8? = nil, dataComponentID: UInt16? = nil) {
         self.pid = pid
         self.streamType = streamType
+        self.componentTag = componentTag
+        self.dataComponentID = dataComponentID
+    }
+    public init(_ es: mzv_es) {
+        self.init(pid: es.pid, streamType: es.stream_type,
+                  componentTag: es.component_tag >= 0 ? UInt8(es.component_tag) : nil,
+                  dataComponentID: es.data_component_id != 0 ? es.data_component_id : nil)
     }
     public var isVideo: Bool { streamType == 0x1b }
     public var isAudio: Bool { streamType == 0x0f || streamType == 0x11 }
+    /// ARIB/ABNT closed captions: private PES, component tag 0x30–0x37 (0x87
+    /// for one-seg); superimposed text uses 0x38–0x3F and isn't this
+    public var isCaption: Bool {
+        guard streamType == 0x06 else { return false }
+        if let tag = componentTag { return (0x30...0x37).contains(tag) || tag == 0x87 }
+        return dataComponentID == 0x0008
+    }
 }
 
 public struct PlaybackStats: Sendable, Equatable {
@@ -45,6 +64,13 @@ public struct PlaybackStats: Sendable, Equatable {
     public var videoSize: CGSize = .zero
     public var interlaced = false
     public var audioDescription = ""
+    /// The program has a closed-caption stream
+    public var hasCaptions = false
+    public var captionScreens = 0
+    /// ISO 639-2 code from the caption management data ("spa", "por")
+    public var captionLanguage: String?
+    /// Caption screens whose PTS was off the program clock, shown on arrival instead
+    public var captionsRetimed = 0
     public var deinterlace: DeinterlaceMode = .off  // what's being applied now
     public var decodedFrames = 0
     public var outputFrames = 0
@@ -65,6 +91,10 @@ public final class PlaybackEngine: @unchecked Sendable {
     public let synchronizer = AVSampleBufferRenderSynchronizer()
     public let videoRenderer: AVSampleBufferVideoRenderer
     public let audioRenderer = AVSampleBufferAudioRenderer()
+    /// The caption screen to show, as the playback clock reaches it (an empty
+    /// page clears the captions); only the newest is kept
+    public let captions: AsyncStream<CaptionPage>
+    private let captionContinuation: AsyncStream<CaptionPage>.Continuation
 
     /// Audio that must be queued past the start point before the clock starts
     public var startupAudio = 0.4
@@ -87,11 +117,22 @@ public final class PlaybackEngine: @unchecked Sendable {
     private let audioReceiver: AVSampleBufferAudioRenderer.Receiver
     private let video: VideoPipeline
     private var timer: DispatchSourceTimer?
+    /// Presents captions on time; runs only while the program has captions
+    private var captionTimer: DispatchSourceTimer?
+    private var captionTimerRunning = false
     private var eventTasks: [Task<Void, Never>] = []
 
     private var streams: [ProgramStream] = []
     private var videoPID: UInt16?
     private var audioPID: UInt16?
+    private var captionPID: UInt16?
+    private var captionDecoder = ARIBCaptionDecoder()
+    private var captionClock = CaptionClock()
+    /// Screens by time, for burning into frames
+    private let captionTimeline = CaptionTimeline()
+    /// Decoded screens waiting for the clock, in PTS order
+    private var pendingCaptions: [(time: CMTime, page: CaptionPage)] = []
+    private var shownCaption = CaptionPage()
     private var demux = TSDemuxer(pids: [UInt16]())
     private var h264 = H264Assembler()
     private var aac = AACStreamParser()
@@ -117,6 +158,7 @@ public final class PlaybackEngine: @unchecked Sendable {
         video = VideoPipeline(receiver: synchronizer.sampleBufferReceiver(adding: videoRenderer),
                               timebase: synchronizer.timebase, mode: deinterlace)
         audioReceiver = synchronizer.sampleBufferReceiver(adding: audioRenderer)
+        (captions, captionContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
 
         let videoEvents = video.events
         let audioEvents = audioReceiver.renderingEventsAfterFinishedEnqueuing
@@ -141,10 +183,18 @@ public final class PlaybackEngine: @unchecked Sendable {
         t.setEventHandler { [weak self] in self?.housekeeping() }
         t.resume()
         timer = t
+
+        let c = DispatchSource.makeTimerSource(queue: queue)
+        c.schedule(deadline: .now(), repeating: .milliseconds(40), leeway: .milliseconds(5))
+        c.setEventHandler { [weak self] in self?.presentCaptions() }
+        captionTimer = c
     }
 
     deinit {
         timer?.cancel()
+        if !captionTimerRunning { captionTimer?.resume() }  // a suspended source can't be released
+        captionTimer?.cancel()
+        captionContinuation.finish()
         eventTasks.forEach { $0.cancel() }
     }
 
@@ -156,7 +206,16 @@ public final class PlaybackEngine: @unchecked Sendable {
             self.streams = streams
             videoPID = streams.first(where: \.isVideo)?.pid
             audioPID = streams.first(where: \.isAudio)?.pid
-            demux.setPIDs([videoPID, audioPID].compactMap { $0 }, pcrPID: nil)
+            captionPID = streams.first(where: \.isCaption)?.pid
+            stats.hasCaptions = captionPID != nil
+            stats.captionLanguage = nil
+            demux.setPIDs([videoPID, audioPID, captionPID].compactMap { $0 }, pcrPID: nil)
+            if captionPID != nil && !captionTimerRunning {
+                captionTimer?.resume()
+            } else if captionPID == nil && captionTimerRunning {
+                captionTimer?.suspend()
+            }
+            captionTimerRunning = captionPID != nil
             restart()
         }
     }
@@ -190,6 +249,17 @@ public final class PlaybackEngine: @unchecked Sendable {
         set { queue.async { self.video.mode = newValue } }
     }
 
+    /// Draws captions into the picture itself, for Picture in Picture (which
+    /// shows only the video layer); frames already queued stay as they are
+    public func burnInCaptions(_ on: Bool) {
+        if on {
+            let timeline = captionTimeline
+            video.setCaptionSource { timeline.page(at: $0) }
+        } else {
+            video.setCaptionSource(nil)
+        }
+    }
+
     public func currentStats() -> PlaybackStats {
         let v = video.currentStats()
         return queue.sync {
@@ -218,6 +288,7 @@ public final class PlaybackEngine: @unchecked Sendable {
             synchronizer.setRate(0, time: .zero)
             video.flush()
             audioReceiver.flush()
+            clearCaptions()
             state = .idle
         }
     }
@@ -242,6 +313,7 @@ public final class PlaybackEngine: @unchecked Sendable {
         audioDecoder.reset()
         pendingVideo.removeAll()
         pendingAudio.removeAll()
+        clearCaptions()
         lastVideoEnd = .invalid
         lastAudioEnd = .invalid
         lastVideoPTS = .invalid
@@ -332,6 +404,41 @@ public final class PlaybackEngine: @unchecked Sendable {
                 }
                 enqueue(audio: sb)
             }
+        } else if pes.pid == captionPID {
+            guard let page = captionDecoder.decode(pes.payload) else { return }
+            stats.captionScreens += 1
+            stats.captionLanguage = page.language
+            let time = captionClock.time(pts: pes.pts, muxedWith: lastVideoEnd.isValid ? lastVideoEnd : lastAudioEnd)
+            stats.captionsRetimed = captionClock.retimed
+            if time.isValid { captionTimeline.append(page, at: time) }
+            // a screen without a time shows at once; a few seconds' worth is plenty to hold
+            pendingCaptions.append((time.isValid ? time : .negativeInfinity, page))
+            if pendingCaptions.count > 64 { pendingCaptions.removeFirst(pendingCaptions.count - 64) }
+        }
+    }
+
+    /// Every 40 ms while there are captions: shows the newest screen that's due
+    private func presentCaptions() {
+        guard state == .playing, !pendingCaptions.isEmpty else { return }
+        let now = synchronizer.currentTime()
+        guard let due = pendingCaptions.lastIndex(where: { $0.time <= now }) else { return }
+        let page = pendingCaptions[due].page
+        pendingCaptions.removeFirst(due + 1)
+        if page != shownCaption {
+            shownCaption = page
+            captionContinuation.yield(page)
+        }
+    }
+
+    /// Takes captions off the screen and forgets the stream's state (zap, restart)
+    private func clearCaptions() {
+        pendingCaptions.removeAll()
+        captionDecoder.reset()
+        captionClock.reset()
+        captionTimeline.removeAll()
+        if !shownCaption.lines.isEmpty {
+            shownCaption = CaptionPage()
+            captionContinuation.yield(shownCaption)
         }
     }
 

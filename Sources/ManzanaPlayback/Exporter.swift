@@ -6,7 +6,8 @@ import ManzanaCore
 import ManzanaStream
 
 /// Turns a recording (MPEG-TS) into an MP4 that QuickTime, Photos and iOS
-/// play: HEVC, deinterlaced to the field rate like live playback, and AAC.
+/// play: HEVC, deinterlaced to the field rate like live playback, and AAC,
+/// with the closed captions as a subtitle track (3GPP timed text).
 ///
 /// The file is read as fast as the decoder and encoder go. Video runs through
 /// the same VideoPipeline as playback (VideoToolbox decode, Metal
@@ -23,6 +24,8 @@ public final class Exporter: @unchecked Sendable {
         /// Seconds of silence put into audio gaps (signal loss while recording)
         public var silence: Double = 0
         public var duration: Double = 0
+        /// Caption screens (with text) written to the subtitle track
+        public var captions = 0
     }
 
     public enum ExportError: LocalizedError {
@@ -124,6 +127,10 @@ public final class Exporter: @unchecked Sendable {
         let audioDecoder = AudioDecoder()
         var videoPID: UInt16?
         var audioPID: UInt16?
+        var captionPID: UInt16?
+        var captions = ARIBCaptionDecoder()
+        var captionClock = CaptionClock()
+        var newestVideo: CMTime = .invalid, newestAudio: CMTime = .invalid
         var haveSync = false
         // compressed video waiting for room in the decoder; reading goes on
         // meanwhile, so audio keeps flowing to the writer
@@ -157,12 +164,23 @@ public final class Exporter: @unchecked Sendable {
                         haveSync = true
                     }
                     guard let sb = try? factory.sampleBuffer(for: frame) else { continue }
+                    let pts = CMSampleBufferGetPresentationTimeStamp(sb)
+                    if pts.isValid, !newestVideo.isValid || pts > newestVideo { newestVideo = pts }
                     waiting.append(sb)
                 }
             } else if pes.pid == audioPID {
                 for frame in aac.feed(pes) {
-                    if let sb = try? audioDecoder.decode(frame) { writer.appendAudio(sb) }
+                    if let sb = try? audioDecoder.decode(frame) {
+                        newestAudio = CMSampleBufferGetPresentationTimeStamp(sb)
+                        writer.appendAudio(sb)
+                    }
                 }
+            } else if pes.pid == captionPID {
+                let page = captions.decode(pes.payload)
+                if let language = captions.page.language { writer.captionLanguage(language) }
+                guard let page else { return }
+                let time = captionClock.time(pts: pes.pts, muxedWith: newestVideo.isValid ? newestVideo : newestAudio)
+                if time.isValid { writer.appendCaption(page.text, at: time) }
             }
         }
 
@@ -181,13 +199,14 @@ public final class Exporter: @unchecked Sendable {
                 generation = prog.generation
                 let streams = withUnsafeBytes(of: prog.es) { raw in
                     raw.bindMemory(to: mzv_es.self).prefix(Int(prog.nes)).map {
-                        ProgramStream(pid: $0.pid, streamType: $0.stream_type)
+                        ProgramStream($0)
                     }
                 }
                 videoPID = streams.first(where: \.isVideo)?.pid
                 audioPID = streams.first(where: \.isAudio)?.pid
-                demux.setPIDs([videoPID, audioPID].compactMap { $0 }, pcrPID: nil)
-                writer.expect(video: videoPID != nil, audio: audioPID != nil)
+                captionPID = streams.first(where: \.isCaption)?.pid
+                demux.setPIDs([videoPID, audioPID, captionPID].compactMap { $0 }, pcrPID: nil)
+                writer.expect(video: videoPID != nil, audio: audioPID != nil, captions: captionPID != nil)
             }
             if kept > 0 {
                 out.withUnsafeBytes { raw in
@@ -237,8 +256,17 @@ private final class Writer: @unchecked Sendable {
     // queue-confined
     private var expectVideo = true
     private var expectAudio = true
+    private var expectCaptions = false
+    private var language: String?
     private var videoReceiver: AVAssetWriterInput.PixelBufferReceiver?
     private var audioReceiver: AVAssetWriterInput.SampleBufferReceiver?
+    private var captionReceiver: AVAssetWriterInput.SampleBufferReceiver?
+    /// Caption screens from before the start
+    private var earlyCaptions: [(text: String, time: CMTime)] = []
+    /// The screen on show, written once the next one says how long it lasts
+    private var openCaption: (text: String, time: CMTime)?
+    private var queuedCaptions: [CMSampleBuffer] = []
+    private var captionsWritten = false
     private var started = false
     private var audioDone = false      // no more audio will come
     private var audioFinished = false  // ...and the input's been told
@@ -269,11 +297,34 @@ private final class Writer: @unchecked Sendable {
 
     var failure: String? { queue.sync { _failure } }
 
-    func expect(video: Bool, audio: Bool) {
+    func expect(video: Bool, audio: Bool, captions: Bool) {
         queue.sync {
             guard !started else { return }
             expectVideo = video
             expectAudio = audio
+            expectCaptions = captions
+        }
+    }
+
+    /// ISO 639-2, for the subtitle track (known within a second or so of captions)
+    func captionLanguage(_ code: String) {
+        queue.sync {
+            guard language == nil else { return }
+            language = code
+            if !started { startIfReady() }
+        }
+    }
+
+    /// A caption screen (the text shown from `time` until the next one; "" clears)
+    func appendCaption(_ text: String, at time: CMTime) {
+        queue.sync {
+            guard _failure == nil else { return }
+            if started {
+                caption(text, at: time)
+                drain()
+            } else {
+                earlyCaptions.append((text, time))
+            }
         }
     }
 
@@ -322,6 +373,7 @@ private final class Writer: @unchecked Sendable {
                 if queuedVideo.isEmpty { expectVideo = false }
                 if queuedAudio.isEmpty { expectAudio = false }
                 guard expectVideo || expectAudio else { throw Exporter.ExportError.nothingDecoded }
+                if language == nil { language = "und" }
                 startIfReady()
             }
             // write out everything left, ending each track as it runs out
@@ -341,6 +393,8 @@ private final class Writer: @unchecked Sendable {
             if let _failure { throw Exporter.ExportError.writer(_failure) }
             if !videoFinished { videoReceiver?.finish() }
             if !audioFinished { audioReceiver?.finish() }
+            finishCaptions()
+            if let _failure { throw Exporter.ExportError.writer(_failure) }
             if end.isValid { writer.endSession(atSourceTime: end) }
             var s = self.summary
             s.duration = start.isValid && end.isValid ? (end - start).seconds : 0
@@ -363,8 +417,11 @@ private final class Writer: @unchecked Sendable {
     private func startIfReady() {
         let videoReady = !expectVideo || !queuedVideo.isEmpty
         let audioReady = !expectAudio || !queuedAudio.isEmpty
+        // the subtitle track's language is set when it's added: wait a little for it
+        let captionsReady = !expectCaptions || language != nil
         let starving = queuedVideo.count > 120 || queuedAudio.count > 400
-        guard (videoReady && audioReady) || starving else { return }
+        guard (videoReady && audioReady && captionsReady) || starving else { return }
+        guard videoReady || audioReady else { return }
         if starving {
             if queuedVideo.isEmpty { expectVideo = false }
             if queuedAudio.isEmpty { expectAudio = false }
@@ -412,6 +469,13 @@ private final class Writer: @unchecked Sendable {
             guard writer.canAdd(input) else { return fail(String(localized: "The audio can't be encoded.")) }
             audioReceiver = writer.inputReceiver(for: input)
         }
+        if expectCaptions, let format = Self.timedTextFormat {
+            let input = AVAssetWriterInput(mediaType: .subtitle, outputSettings: nil, sourceFormatHint: format)
+            input.languageCode = language ?? "und"
+            // closed captions: there to turn on, not shown by default
+            input.marksOutputTrackAsEnabled = false
+            if writer.canAdd(input) { captionReceiver = writer.inputReceiver(for: input) }
+        }
         if videoReceiver == nil { queuedVideo.removeAll() }
         if audioReceiver == nil { queuedAudio.removeAll() }
         guard videoReceiver != nil || audioReceiver != nil else {
@@ -426,12 +490,131 @@ private final class Writer: @unchecked Sendable {
         start = videoReceiver != nil ? queuedVideo[0].1 : CMSampleBufferGetPresentationTimeStamp(queuedAudio[0])
         writer.startSession(atSourceTime: start)
         started = true
+        for c in earlyCaptions { caption(c.text, at: c.time) }
+        earlyCaptions.removeAll()
         drain()
+    }
+
+    // MARK: captions
+
+    /// Closes the screen on show at `time` and opens this one. Samples cover
+    /// the track end to end, blanks included, as timed text wants.
+    private func caption(_ text: String, at time: CMTime) {
+        guard captionReceiver != nil else { return }
+        let t = max(time, start)  // said before the first picture: show from the start
+        if let open = openCaption {
+            guard t > open.time else {
+                openCaption = (text, open.time)  // same instant: the newer screen wins
+                return
+            }
+            queueCaption(open.text, from: open.time, to: t)
+        } else if t > start {
+            queueCaption("", from: start, to: t)
+        }
+        openCaption = (text, t)
+        if !text.isEmpty { summary.captions += 1 }
+    }
+
+    /// The writer interleaves by time and holds the picture back until every
+    /// track has caught up, so the screen on show is written in pieces as the
+    /// picture advances (players show consecutive same-text samples as one)
+    private func advanceCaptions(to t: CMTime) {
+        guard captionReceiver != nil, t.isValid, t > start else { return }
+        let open = openCaption ?? ("", start)
+        guard (t - open.time).seconds >= 0.5 else {
+            openCaption = open
+            return
+        }
+        queueCaption(open.text, from: open.time, to: t)
+        openCaption = (open.text, t)
+    }
+
+    private func queueCaption(_ text: String, from: CMTime, to: CMTime) {
+        guard let sample = Self.timedText(text, at: from, duration: to - from) else { return }
+        queuedCaptions.append(sample)
+    }
+
+    private func finishCaptions() {
+        guard let receiver = captionReceiver else { return }
+        let stop = end.isValid ? end : start
+        if let open = openCaption, stop > open.time {
+            queueCaption(open.text, from: open.time, to: stop)
+        } else if openCaption == nil, !captionsWritten, queuedCaptions.isEmpty, stop > start {
+            queueCaption("", from: start, to: stop)  // no captions after all: an empty track, not a broken one
+        }
+        openCaption = nil
+        var tries = 0
+        while !queuedCaptions.isEmpty && _failure == nil {
+            drainCaptions()
+            tries += 1
+            if tries > 10_000 { fail(String(localized: "The encoder stopped responding.")) } else if !queuedCaptions.isEmpty { usleep(1000) }
+        }
+        receiver.finish()
+    }
+
+    private func drainCaptions() {
+        guard let receiver = captionReceiver else {
+            queuedCaptions.removeAll()
+            return
+        }
+        while let sample = queuedCaptions.first {
+            nonisolated(unsafe) let owned = sample
+            switch attempt({ try receiver.appendImmediately(CMReadySampleBuffer(unsafeBuffer: owned)) }) {
+            case .written, .skipped:
+                queuedCaptions.removeFirst()
+                captionsWritten = true
+            case .notNow, .failed:
+                return
+            }
+        }
+    }
+
+    /// 3GPP timed text (tx3g): centred at the bottom, white, the player's own font and size
+    private static let timedTextFormat: CMFormatDescription? = {
+        var d: [UInt8] = []
+        func u16(_ v: Int) { d += [UInt8(v >> 8 & 0xff), UInt8(v & 0xff)] }
+        func u32(_ v: Int) { u16(v >> 16); u16(v & 0xffff) }
+        let font = Array("Sans-Serif".utf8)
+        u32(0)                                   // size, filled in below
+        d += Array("tx3g".utf8)
+        d += [0, 0, 0, 0, 0, 0]; u16(1)          // reserved, data_reference_index
+        u32(0)                                   // display flags
+        d += [0x01, 0xff]                        // justification: centred, bottom
+        d += [0, 0, 0, 0]                        // background: none
+        u16(0); u16(0); u16(0); u16(0)           // default text box: the whole track
+        u16(0); u16(0); u16(1); d += [0, 18]     // style: chars, font 1, plain, 18 pt
+        d += [0xff, 0xff, 0xff, 0xff]            // white
+        u32(8 + 2 + 3 + font.count); d += Array("ftab".utf8)
+        u16(1); u16(1); d.append(UInt8(font.count)); d += font
+        let size = d.count
+        d[0] = UInt8(size >> 24 & 0xff); d[1] = UInt8(size >> 16 & 0xff); d[2] = UInt8(size >> 8 & 0xff); d[3] = UInt8(size & 0xff)
+        var format: CMFormatDescription?
+        let status = d.withUnsafeBufferPointer {
+            CMTextFormatDescriptionCreateFromBigEndianTextDescriptionData(
+                allocator: nil, bigEndianTextDescriptionData: $0.baseAddress!, size: $0.count,
+                flavor: nil, mediaType: kCMMediaType_Subtitle, formatDescriptionOut: &format)
+        }
+        return status == noErr ? format : nil
+    }()
+
+    /// One tx3g sample: a 16-bit length, then the UTF-8 text
+    private static func timedText(_ text: String, at pts: CMTime, duration: CMTime) -> CMSampleBuffer? {
+        guard let format = timedTextFormat, duration > .zero else { return nil }
+        let utf8 = Array(text.utf8.prefix(0xffff))
+        guard let block = try? makeBlockBuffer([UInt8(utf8.count >> 8), UInt8(utf8.count & 0xff)] + utf8) else { return nil }
+        var timing = CMSampleTimingInfo(duration: duration, presentationTimeStamp: pts, decodeTimeStamp: .invalid)
+        var size = utf8.count + 2
+        var sample: CMSampleBuffer?
+        CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: block, formatDescription: format,
+                                  sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                  sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
+        return sample
     }
 
     /// Appends what the writer will take right now, in order
     private func drain() {
         guard _failure == nil else { return }
+        drainCaptions()
         var progress = true
         while progress {
             progress = false
@@ -457,6 +640,12 @@ private final class Writer: @unchecked Sendable {
                 case .notNow: break
                 case .failed: return
                 }
+            }
+            let before = queuedCaptions.count
+            advanceCaptions(to: lastVideo.isValid ? lastVideo : audioEnd)
+            if queuedCaptions.count > before {
+                drainCaptions()
+                progress = true
             }
             if audioDone, queuedAudio.isEmpty, !audioFinished {
                 audioReceiver?.finish()

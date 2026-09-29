@@ -158,6 +158,8 @@ bool mzv_filter_program(const mzv_filter *f, struct mzv_program *out)
 	for (int i = 0; i < out->nes; i++) {
 		out->es[i].stream_type = prog->es[i].stream_type;
 		out->es[i].pid = prog->es[i].pid;
+		out->es[i].component_tag = prog->es[i].component_tag;
+		out->es[i].data_component_id = prog->es[i].data_component_id;
 	}
 	return true;
 }

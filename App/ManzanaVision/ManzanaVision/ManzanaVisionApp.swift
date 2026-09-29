@@ -12,7 +12,10 @@ struct ManzanaVisionApp: App {
             ContentView()
                 .environment(model)
                 .frame(minWidth: 720, minHeight: 405)
-                .onAppear { pip.attach(to: model.layer) }
+                .onAppear {
+                    pip.attach(to: model.layer)
+                    pip.activeChanged = { [model] in model.pictureInPicture = $0 }
+                }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     model.applicationWillTerminate()
                 }
@@ -35,6 +38,8 @@ struct ManzanaVisionApp: App {
                     .keyboardShortcut("i", modifiers: .command)
                 Button("Picture in Picture") { pip.toggle() }
                     .keyboardShortcut("p", modifiers: [.command, .control])
+                Toggle("Closed Captions", isOn: Bindable(model).showCaptions)
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
                 Divider()
                 if model.recording != nil {
                     Button("Stop Recording") { model.stopRecording() }

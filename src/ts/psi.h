@@ -31,6 +31,8 @@ struct psi_program {
 	struct {
 		uint8_t stream_type;
 		uint16_t pid;
+		int16_t component_tag;		/* stream_identifier_descriptor, -1 if absent */
+		uint16_t data_component_id;	/* data_component_descriptor, 0 if absent */
 	} es[PSI_MAX_ES];
 };
 

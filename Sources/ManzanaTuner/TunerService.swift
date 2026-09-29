@@ -12,6 +12,8 @@ public final class StreamSink: @unchecked Sendable {
     public struct ElementaryStream: Sendable, Equatable {
         public var pid: UInt16
         public var streamType: UInt8
+        public var componentTag: UInt8?
+        public var dataComponentID: UInt16?
     }
 
     let packets: @Sendable (Data, UInt32) -> Void
@@ -144,7 +146,10 @@ public actor TunerService {
             let p = prog!.pointee
             let es = withUnsafeBytes(of: p.es) { raw in
                 raw.bindMemory(to: mzv_es.self).prefix(Int(p.nes)).map {
-                    StreamSink.ElementaryStream(pid: $0.pid, streamType: $0.stream_type)
+                    StreamSink.ElementaryStream(
+                        pid: $0.pid, streamType: $0.stream_type,
+                        componentTag: $0.component_tag >= 0 ? UInt8($0.component_tag) : nil,
+                        dataComponentID: $0.data_component_id != 0 ? $0.data_component_id : nil)
                 }
             }
             sink.program(es)

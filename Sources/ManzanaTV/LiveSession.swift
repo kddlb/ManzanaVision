@@ -234,7 +234,12 @@ public final class LiveSession: TVSession, @unchecked Sendable {
                 engine.feed(data, epoch: base + epoch)
                 if let r = lock.withLock({ recorder }), r.channel == channel { r.write(data) }
             },
-            program: { es in engine.setProgram(es.map { ProgramStream(pid: $0.pid, streamType: $0.streamType) }) },
+            program: { es in
+                engine.setProgram(es.map {
+                    ProgramStream(pid: $0.pid, streamType: $0.streamType,
+                                  componentTag: $0.componentTag, dataComponentID: $0.dataComponentID)
+                })
+            },
             signal: { [self] s in
                 let reception = lock.withLock {
                     _signal = s

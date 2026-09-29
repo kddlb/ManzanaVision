@@ -125,7 +125,7 @@ public final class FileSource: @unchecked Sendable {
                     pcrPID = prog.pcr_pid
                     program(withUnsafeBytes(of: prog.es) { raw in
                         raw.bindMemory(to: mzv_es.self).prefix(Int(prog.nes)).map {
-                            ProgramStream(pid: $0.pid, streamType: $0.stream_type)
+                            ProgramStream($0)
                         }
                     })
                 }

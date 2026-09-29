@@ -35,6 +35,40 @@ struct Export {
         #expect(summary.videoFrames > 1150)
     }
 
+    @Test func captionsBecomeASubtitleTrack() async throws {
+        let (url, summary) = try await export("rf27-5min-20s", service: 0x2600)  // 9.1: Spanish captions
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(summary.captions > 20)
+        let asset = AVURLAsset(url: url)
+        let track = try #require(try await asset.loadTracks(withMediaType: .subtitle).first)
+        #expect(try await track.load(.languageCode) == "spa")
+        #expect(try await track.load(.isEnabled) == false)
+        let subtype = try await track.load(.formatDescriptions).first.map(CMFormatDescriptionGetMediaSubType)
+        #expect(subtype == kCMTextFormatType_3GText)
+
+        // the text reads back, and the track spans the movie
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        reader.add(output)
+        #expect(reader.startReading())
+        var texts: [String] = []
+        var last: CMTime = .zero
+        while let sample = output.copyNextSampleBuffer() {
+            last = CMSampleBufferGetPresentationTimeStamp(sample) + CMSampleBufferGetDuration(sample)
+            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+            var bytes = [UInt8](repeating: 0, count: CMBlockBufferGetDataLength(block))
+            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: bytes.count, destination: &bytes)
+            guard bytes.count >= 2 else { continue }
+            let n = Int(bytes[0]) << 8 | Int(bytes[1])
+            texts.append(String(decoding: bytes[2..<min(bytes.count, 2 + n)], as: UTF8.self))
+        }
+        #expect(texts.contains { $0.contains("Ó") || $0.contains("É") })
+        // a screen on show a while is split into pieces with the same text
+        #expect(Set(texts.filter { !$0.isEmpty }).count >= summary.captions / 2)
+        let duration = try await asset.load(.duration)
+        #expect(abs((last - duration).seconds) < 1, "captions end at \(last.seconds), movie at \(duration.seconds)")
+    }
+
     @Test func progressiveStaysAtItsRate() async throws {
         let (url, _) = try await export("rf32-5min-20s", service: 0x22)  // 14.3: 720p, AAC at 44.1 kHz
         defer { try? FileManager.default.removeItem(at: url) }
