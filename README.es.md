@@ -25,6 +25,7 @@ El firmware del sintonizador y libusb vienen incluidos en la app.
 - **Los problemas se explican en pantalla:** sintonizador desconectado, en uso por otro programa, sin señal, recepción débil o mala. Tras un corte, la imagen se difumina mientras la app vuelve a sintonizar sola, y retoma la reproducción cuando se vuelve a conectar el sintonizador.
 - **Pantalla completa** muestra solo la imagen: haz doble clic sobre ella y presiona Esc para salir. **Imagen dentro de imagen** está en el menú Canal (⌃⌘P).
 - **Grabar** (⌘R, o Canal → Grabar durante) guarda el canal tal como se transmite, en MPEG-TS, en Películas/ManzanaVision; VLC, IINA y mpv lo reproducen. **Archivo → Exportar grabación para QuickTime** convierte una grabación en un MP4 (HEVC, desentrelazado a 60 fps, AAC) para QuickTime, Fotos o un iPhone.
+- **Sin guía de programación (EPG).** No se puede desarrollar ni probar aquí, porque ninguno de los canales que se reciben donde se desarrolló transmite una utilizable: Mega cifra su guía completa (H-EIT) y en la de one-seg (L-EIT) solo manda secciones de ahora/siguiente vacías y con sumas de verificación corruptas, y CNC no transmite datos de guía.
 - La app está en inglés, español y portugués de Brasil.
 
 La numeración de canales sigue el plan ABNT/SBTVD que se usa en Brasil, Chile y el resto de Latinoamérica: el canal *n* está centrado en 473 + 6·(n−14) + 1/7 MHz.
