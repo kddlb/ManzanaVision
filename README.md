@@ -25,7 +25,7 @@ The tuner firmware and libusb are built into the app.
 - **Problems are explained on screen:** tuner not plugged in, in use by another program, no signal, weak or poor reception. After a dropout the picture blurs while the app re-tunes by itself, and it picks up again when the stick is plugged back in.
 - **Full screen** shows nothing but the picture: double-click it, press Esc to leave. **Picture in Picture** is in the Channel menu (⌃⌘P).
 - **Recording** (⌘R, or Channel → Record For) saves the channel exactly as broadcast, in MPEG-TS, to Movies/ManzanaVision; VLC, IINA and mpv play it. **File → Export Recording for QuickTime** turns a recording into an MP4 (HEVC, deinterlaced to 60 fps, AAC) for QuickTime, Photos or an iPhone.
-- **No programme guide (EPG).** It can't be built or tested here, because none of the channels receivable where it was developed sends a usable one: Mega encrypts its full guide (H-EIT) and sends only empty now/next sections with corrupted checksums on the one-seg one (L-EIT), and CNC sends no guide data at all.
+- **No programme guide (EPG).** It can't be built or tested here, because none of the channels receivable in Antofagasta sends a usable one: Mega encrypts its full guide (H-EIT) and sends only empty now/next sections with corrupted checksums on the one-seg one (L-EIT), and CNC sends no guide data at all.
 - The app is in English, Spanish and Brazilian Portuguese.
 
 Channel numbering follows the ABNT/SBTVD plan used in Brazil, Chile and the rest of Latin America: channel *n* is centred on 473 + 6·(n−14) + 1/7 MHz.

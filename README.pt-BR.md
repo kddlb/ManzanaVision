@@ -25,7 +25,7 @@ O firmware do sintonizador e a libusb já vêm dentro do app.
 - **Os problemas são explicados na tela:** sintonizador desconectado, em uso por outro programa, sem sinal, recepção fraca ou ruim. Depois de uma queda, a imagem fica desfocada enquanto o app ressintoniza sozinho, e a reprodução volta quando o sintonizador é conectado de novo.
 - **Tela cheia** mostra só a imagem: clique duas vezes nela e pressione Esc para sair. **Picture in Picture** fica no menu Canal (⌃⌘P).
 - **Gravar** (⌘R, ou Canal → Gravar por) salva o canal exatamente como transmitido, em MPEG-TS, em Filmes/ManzanaVision; VLC, IINA e mpv tocam o arquivo. **Arquivo → Exportar gravação para QuickTime** converte uma gravação em MP4 (HEVC, desentrelaçado a 60 fps, AAC) para o QuickTime, o Fotos ou um iPhone.
-- **Sem guia de programação (EPG).** Não dá para desenvolvê-lo nem testá-lo aqui, porque nenhum dos canais recebidos onde ele foi desenvolvido transmite um guia utilizável: a Mega criptografa o guia completo (H-EIT) e no de 1seg (L-EIT) manda só seções de agora/próximo vazias e com checksums corrompidos, e a CNC não transmite dados de guia.
+- **Sem guia de programação (EPG).** Não dá para desenvolvê-lo nem testá-lo aqui, porque nenhum dos canais recebidos em Antofagasta transmite um guia utilizável: a Mega criptografa o guia completo (H-EIT) e no de 1seg (L-EIT) manda só seções de agora/próximo vazias e com checksums corrompidos, e a CNC não transmite dados de guia.
 - O app está em inglês, espanhol e português do Brasil.
 
 A numeração dos canais segue o plano ABNT/SBTVD usado no Brasil, no Chile e no resto da América Latina: o canal *n* é centrado em 473 + 6·(n−14) + 1/7 MHz.
